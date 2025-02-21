@@ -41,22 +41,27 @@
 clone项目后，下载**Todo Tree**插件，可以查看代码中所有具体位置的 todo
 
 ## 视频demo
+
 <video src=""></video>
 
 ## 📖 使用教程
 
 1. 安装依赖
+
 ```bash
 git clone
 pip install uv
 uv sync # 安装依赖
 ```
+
 2. 配置模型
-复制`/config/config.toml.example`到`/config/config.toml`,填写配置模型
+
+复制`/config/config.toml.example`到`/config/config.toml`, 填写配置模型
 
 推荐模型能力较强的、参数量大的模型。
 
 3. 运行测试 和 启动项目
+
 ```bash
 uv run example.py # 简单测试能否正确运行
 uv run main.py # 完整项目
