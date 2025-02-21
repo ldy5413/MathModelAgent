@@ -7,14 +7,11 @@
     自动完成数学建模，生成一份完整的可以直接提交的论文。
 </h4>
 
-<br>
+<h5 align="center">简体中文 | <a href="README_EN.md">English</a></h5>
 
-<h6>简体中文 | <a href="README_EN.md">English</a></h5>
+## 🌟 愿景：
 
-
-## 愿景：
-
-3天的比赛时间变为1小时
+3 天的比赛时间变为 1 小时 <br> 
 自动完整一份可以获奖级别的建模论文
 
 ## ✨ 功能特性
@@ -38,9 +35,10 @@
 - [ ] 引入用户的交互（选择模型，重写等等）
 - [ ] codeinterpreter 接入云端 如 e2b 等供应商..
 
-clone项目后，下载**Todo Tree**插件，可以查看代码中所有具体位置的 todo
+clone 项目后，下载**Todo Tree**插件，可以查看代码中所有具体位置的 todo
 
 ## 视频demo
+
 <video src="https://github.com/user-attachments/assets/10b3145a-feb7-4894-aaca-30d44bb35b9e"></video>
 
 ## 📖 使用教程
@@ -48,8 +46,9 @@ clone项目后，下载**Todo Tree**插件，可以查看代码中所有具体�
 1. 安装依赖
 
 ```bash
-git clone
-pip install uv
+git clone https://github.com/jihe520/MathModelAgent.git # 克隆项目
+pip install uv # 推荐使用 uv 管理 python 项目
+uv venv # 创建虚拟环境
 uv sync # 安装依赖
 ```
 
@@ -71,7 +70,7 @@ uv run main.py # 完整项目
 ## 🤝 贡献
 
 - 项目处于**开发阶段**（我有时间就会更新），变更较多，还存在许多 Bug，我正着手修复。
-- 欢迎提交 issue 和 PR
+- 欢迎提交 issues 和 PRs
 - 需求参考 后期计划
 
 ## 📄 版权License

@@ -2,19 +2,16 @@
 <p align="center">
     <img src="./docs/icon.png" height="250px">
 </p>
-
 <h4 align="center">
     An agent designed for mathematical modeling<br>
     Automatically complete mathematical modeling and generate a ready-to-submit paper.
 </h4>
 
 <br>
-
-<h6><a href="README.md">简体中文</a> | English</h5>
-
+<h5 align="center"> <a href="README.md">简体中文</a> | English </h5>
 
 ## Vision:
-
+3 days to 1 hour <br>
 Automatically generate an award-worthy mathematical modeling paper
 
 ## ✨ Features
@@ -42,13 +39,16 @@ After cloning the project, install the **Todo Tree** plugin to view all specific
 
 ## Video Demo
 
+<video src="https://github.com/user-attachments/assets/10b3145a-feb7-4894-aaca-30d44bb35b9e"></video>
+
 
 ## 📖 Usage Guide
 
 1. Install Dependencies
 ```bash
-git clone
+git clone https://github.com/jihe520/MathModelAgent.git
 pip install uv
+uv venv # create venv
 uv sync # install dependencies
 ```
 2. Configure Model
