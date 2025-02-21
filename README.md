@@ -41,8 +41,7 @@
 clone项目后，下载**Todo Tree**插件，可以查看代码中所有具体位置的 todo
 
 ## 视频demo
-
-<video src=""></video>
+<video src="https://github.com/user-attachments/assets/10b3145a-feb7-4894-aaca-30d44bb35b9e"></video>
 
 ## 📖 使用教程
 
