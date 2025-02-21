@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+.vscode/
+
+# IDE
+.idea/
+.cursorrules
+
+# Project specific
+project/work_dir/*
+!project/work_dir/.gitkeep
+.cursor/
+config/config.toml
+config/latex-template/
