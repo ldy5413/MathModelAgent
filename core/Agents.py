@@ -1,10 +1,12 @@
 import json
 from core.LLM import BaseModel
+from models.user_output import UserOutput
 from tools.code_interpreter import CodeInterpreter
 from utils.common_utils import get_current_files
+from utils.enums import CompTemplate, FormatOutPut
 from utils.logger import log
-from utils.notebook_serializer import notebook_serializer
 from utils.RichPrinter import RichPrinter
+from utils.notebook_serializer import NotebookSerializer
 
 functions = [
     {
@@ -35,13 +37,15 @@ class Agent:
         self,
         model: BaseModel,
         max_chat_turns: int = 30,  # 单个agent最大对话轮次
+        user_output: UserOutput = None,
     ) -> None:
         self.model = model
         self.chat_history: list[dict] = []  # 存储对话历史
         self.max_chat_turns = max_chat_turns  # 最大对话轮次
         self.current_chat_turns = 0  # 当前对话轮次计数器
+        self.user_output = user_output
 
-    def run(self, prompt: str) -> str:
+    def run(self, prompt: str, system_prompt:str) -> str:
         """
         执行agent的对话并返回结果和总结
 
@@ -56,7 +60,7 @@ class Agent:
             self.current_chat_turns = 0  # 重置对话轮次计数器
 
             # 更新对话历史
-            self.append_chat_history({"role": "system", "content": self.system_prompt})
+            self.append_chat_history({"role": "system", "content": system_prompt})
             self.append_chat_history({"role": "user", "content": prompt})
 
             # 获取历史消息用于本次对话
@@ -74,10 +78,8 @@ class Agent:
             return error_msg
 
     def append_chat_history(self, msg: dict) -> None:
-        from utils.io import output_content
-
         self.chat_history.append(msg)
-        output_content.data_recorder.append_chat_history(
+        self.user_output.data_recorder.append_chat_history(
             msg, agent_name=self.__class__.__name__
         )
 
@@ -107,14 +109,17 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         work_dir: str,  # 工作目录
         max_chat_turns: int = 60,  # TODO: 配置文件
         max_retries: int = 5,  # 重试次数
+        user_output: UserOutput = None,
     ) -> None:
-        super().__init__(model, max_chat_turns)
+        super().__init__(model, max_chat_turns, user_output)
         self.work_dir = work_dir
-        self.code_interpreter = CodeInterpreter(work_dir)
+        self.notebook_serializer = NotebookSerializer(work_dir)
+        self.code_interpreter = CodeInterpreter(work_dir, self.notebook_serializer)
+
         self.max_retries = max_retries
         self.is_first_run = True
         self.created_images: list[str] = []  # 当前任务创建的图片列表
-        self.system_prompt = f"""You are an AI code interpreter.
+        self.system_prompt = """You are an AI code interpreter.
 Your goal is to help users do a variety of jobs by executing Python code.
 
 When generating code:
@@ -151,18 +156,16 @@ You should:
 12. 在生成代码时，对于包含单引号的字符串，请使用双引号包裹，避免使用转义字符
 13. **你尽量在较少的对话轮次内完成任务。减少反复思考的次数**
 14. 在求解问题和建立模型过程中，适当的进行可视化。
+15 在画图时候，matplotlib 需要正确显示中文，避免乱码问题。
 Note: If the user uploads a file, you will receive a system message "User uploaded a file: filename". Use the filename as the path in the code."""
-        # 初始化notebook
-        notebook_serializer.init_notebook(
-            work_dir=work_dir, notebook_name="notebook.ipynb"
-        )
+
         self.created_images: list[str] = []  # 当前求解创建的图片
 
     def run(self, prompt: str, subtask_title: str) -> str:
         RichPrinter.agent_start(self.__class__.__name__)
         self.created_images.clear()  # 清空上一次任务的图片列表
         # TODO: jupyter 的notebook 分节
-        notebook_serializer.add_markdown_segmentation_to_notebook(
+        self.notebook_serializer.add_markdown_segmentation_to_notebook(
             content=prompt, segmentation=subtask_title
         )
 
@@ -345,6 +348,9 @@ If the task is complete, please provide a summary of what was accomplished about
         previous_images = set(self.created_images)
         self.created_images = list(current_images - previous_images)
 
+    def get_notebook_serializer(self) -> NotebookSerializer:
+        return self.notebook_serializer
+
 
 # 长文本
 # TODO: 并行 parallel
@@ -352,16 +358,19 @@ class WriterAgent(Agent):  # 同样继承自Agent类
     def __init__(
         self,
         model: BaseModel,
-        template: str | None = "markdown",
         max_chat_turns: int = 10,  # 添加最大对话轮次限制
+        comp_template: CompTemplate = CompTemplate,
+        format_output: FormatOutPut = FormatOutPut.Markdown,
+        user_output: UserOutput = None,
     ) -> None:
-        super().__init__(model, max_chat_turns)
-        self.template = template
+        super().__init__(model, max_chat_turns,user_output)
+        self.format_out_put = format_output
+        self.comp_template = comp_template
         self.system_prompt = f"""
         role：你是一名数学建模经验丰富的写作手，负责写作部分。
         task: 根据问题和如下的模板写出解答,
-        skill：熟练掌握{template}排版,
-        output：你需要按照要求的格式排版,只输出{template}排版的内容
+        skill：熟练掌握{format_output}排版,
+        output：你需要按照要求的格式排版,只输出{format_output}排版的内容
         
         1. 当你输入图像引用时候，你需要将用户输入的文件名称路径切换为相对路径
         如用户输入文件路径image_name.png,你转化为../jupyter/image_name.png,就可正确引用显示
@@ -387,7 +396,7 @@ class WriterAgent(Agent):  # 同样继承自Agent类
             )
             prompt = prompt + image_prompt
 
-        return super().run(prompt)
+        return super().run(prompt,self.system_prompt)
 
     def summarize(self) -> str:
         """

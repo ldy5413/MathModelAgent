@@ -6,13 +6,14 @@ import time
 
 
 class BaseModel:
-    def __init__(self, api_key: str, model: str, base_url: str):
+    def __init__(self, api_key: str, model: str, base_url: str, data_reacorder):
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.chat_count = 0
         self.max_tokens: int | None = None  # 添加最大token数限制
+        self.data_recorder = data_reacorder
 
     def chat(
         self,
@@ -63,9 +64,7 @@ class BaseModel:
         self.print_msg(completion, agent_name)
 
     def record_data(self, completion, agent_name: str):
-        from utils.io import output_content
-
-        output_content.data_recorder.append_chat_completion(completion, agent_name)
+        self.data_recorder.append_chat_completion(completion, agent_name)
 
     def print_msg(self, completion, agent_name):
         code = ""
@@ -84,6 +83,6 @@ class BaseModel:
 
 
 class DeepSeekModel(BaseModel):
-    def __init__(self, api_key: str, model: str, base_url: str):
-        super().__init__(api_key, model, base_url)
+    def __init__(self, api_key: str, model: str, base_url: str, data_recorder):
+        super().__init__(api_key, model, base_url, data_recorder)
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)

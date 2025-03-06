@@ -14,6 +14,16 @@ def create_task_id() -> str:
 
 
 def create_work_directories(task_id: str):
+    """
+    summary
+
+    Args:
+        task_id : description
+
+    Returns:
+        base_dir : './project/wirk_dir'
+        dirs : './project/work_dir/*'
+    """
     work_dir_name = task_id
 
     # 设置主工作目录和子目录

@@ -1,23 +1,30 @@
-from core.Agents import CoderAgent
-from core.WorkFlow import SolutionWorkFlow, WriteWorkFlow
+import os
 from core.LLM import DeepSeekModel
-from cli import UserInput
+from utils.cli import UserInput
+from utils.data_recorder import DataRecorder
 from utils.logger import log
-from utils.io import input_content, output_content
-
-
-def init_task():
-    # === 初始化 ===
-    # 设置控制台日志级别为 DEBUG
-    log.set_console_level("WARNING")
-    # 初始化日志系统，设置日志目录
-    log.init(input_content.work_dirs["log"])
+from utils.common_utils import create_work_directories, create_task_id, load_toml
+from config.config import Config
+from models.task import Task
+from models.user_output import UserOutput
 
 
 def start():
-    init_task()
+    log.set_console_level("WARNING")
+
+    # 初始化日志系统，设置日志目录
+    task_id = create_task_id()
+    base_dir, dirs = create_work_directories(task_id)
+    log.init(dirs["log"])
+
+    config = Config(load_toml(os.path.join("config", "config.toml")))
+
+    data_recorder = DataRecorder(dirs["log"])
+
     # 加载配置文件
-    deepseek_model = DeepSeekModel(**input_content.get_config())
+    deepseek_model = DeepSeekModel(
+        **config.get_model_config(), data_recorder=data_recorder
+    )
 
     # 直接设置questions示例
     test_questions = {
@@ -44,28 +51,26 @@ def start():
     }
 
     user_input = UserInput(
-        data_folder_path="E:/Code/Set/Open/MathModelAgent/project/sample_data",
+        data_folder_path="./project/sample_data",
         bg_ques_all="原始问题文本...",
         model=deepseek_model,
         init_with_llm=False,  # 不使用LLM初始化
     )
 
-    # 直接设置预定义的questions
+    user_input.set_config_template(config.get_config_template(user_input.comp_template))
     user_input.set_questions_directly(test_questions)
-    input_content.set_user_input(user_input)
 
-    coder_agent = CoderAgent(
-        deepseek_model, work_dir=input_content.work_dirs["jupyter"]
+    task = Task(
+        task_id=task_id,
+        base_dir=base_dir,
+        work_dirs=dirs,
+        llm=deepseek_model,
+        config=config,
     )
 
-    solution_workflow = SolutionWorkFlow(coder_agent)
-    solution_workflow.execute()
+    user_output: UserOutput = task.run(user_input, data_recorder=data_recorder)
 
-    write_workflow = WriteWorkFlow(model=deepseek_model)
-    write_workflow.execute()
-
-    output_content.data_recorder.print_summary()
-    output_content.save_result()
+    user_output.save_result(ques_count=user_input.get_ques_count())
 
 
 if __name__ == "__main__":

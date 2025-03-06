@@ -2,7 +2,7 @@ import jupyter_client
 import re
 import os
 from utils.logger import log
-from utils.notebook_serializer import notebook_serializer
+from utils.notebook_serializer import NotebookSerializer
 
 
 def delete_color_control_char(string):
@@ -11,11 +11,13 @@ def delete_color_control_char(string):
 
 
 class JupyterKernel:
-    def __init__(self, work_dir):
+    def __init__(self, work_dir, notebook_serializer):
+        self.work_dir = work_dir
+        self.notebook_serializer = notebook_serializer
+
         self.kernel_manager, self.kernel_client = (
             jupyter_client.manager.start_new_kernel(kernel_name="python3")
         )
-        self.work_dir = work_dir
         self.interrupt_signal = False
         self._create_work_dir()
         self.available_functions = {
@@ -25,7 +27,7 @@ class JupyterKernel:
 
     def execute_code_(self, code) -> list[tuple[str, str]]:
         msg_id = self.kernel_client.execute(code)
-
+        log.info(f"执行代码: {code}")
         # Get the output of the code
         msg_list = []
         while True:
@@ -85,7 +87,8 @@ class JupyterKernel:
 
     def execute_code(self, code: str) -> tuple[str, list[tuple[str, str]], bool, str]:
         #  添加代码到notebook
-        notebook_serializer.add_code_cell_to_notebook(code)
+        self.notebook_serializer.add_code_cell_to_notebook(code)
+
         text_to_gpt: list[str] = []
         content_to_display: list[tuple[str, str]] = self.execute_code_(code)
         error_occurred: bool = False
@@ -95,7 +98,9 @@ class JupyterKernel:
             if mark in ("stdout", "execute_result_text", "display_text"):
                 text_to_gpt.append(out_str)
                 #  添加text到notebook
-                notebook_serializer.add_code_cell_output_to_notebook(out_str)
+
+                self.notebook_serializer.add_code_cell_output_to_notebook(out_str)
+
             elif mark in (
                 "execute_result_png",
                 "execute_result_jpeg",
@@ -106,34 +111,38 @@ class JupyterKernel:
                 text_to_gpt.append("[image]")
                 #  添加image到notebook
                 if "png" in mark:
-                    notebook_serializer.add_image_to_notebook(out_str, "image/png")
+                    self.notebook_serializer.add_image_to_notebook(out_str, "image/png")
                 else:
-                    notebook_serializer.add_image_to_notebook(out_str, "image/jpeg")
+                    self.notebook_serializer.add_image_to_notebook(
+                        out_str, "image/jpeg"
+                    )
+
             elif mark == "error":
                 error_occurred = True
                 error_message = delete_color_control_char(out_str)
                 text_to_gpt.append(error_message)
                 #  添加error到notebook
-                notebook_serializer.add_code_cell_error_to_notebook(out_str)
+                self.notebook_serializer.add_code_cell_error_to_notebook(out_str)
         log.debug("\ncontent_to_display:\n" + str(content_to_display))
         log.debug("\n\n执行代码:\n" + "\n".join(text_to_gpt))
 
         return "\n".join(text_to_gpt), content_to_display, error_occurred, error_message
 
     def _create_work_dir(self):
-        # 规范化路径
         self.work_dir = os.path.normpath(self.work_dir)
 
-        # 设置 Jupyter 环境中的工作目录
         init_code = (
             f"import os\n"
-            f"work_dir = r'{self.work_dir}'\n"  # 使用原始字符串
+            f"work_dir = r'{self.work_dir}'\n"
             f"os.makedirs(work_dir, exist_ok=True)\n"
             f"os.chdir(work_dir)\n"
             f"print('当前工作目录:', os.getcwd())\n"
             f"import matplotlib.pyplot as plt\n"
-            f"plt.rcParams['font.sans-serif'] = ['SimHei']\n"
+# 更完整的中文字体配置
+            f"plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']\n"
             f"plt.rcParams['axes.unicode_minus'] = False\n"
+f"plt.rcParams['font.family'] = 'sans-serif'\n"
+            # 设置DPI以获得更清晰的显示
         )
         self.execute_code_(init_code)
 

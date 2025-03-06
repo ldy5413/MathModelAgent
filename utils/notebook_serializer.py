@@ -5,24 +5,18 @@ import os
 
 
 class NotebookSerializer:
-    _instance = None
+    def __init__(self, work_dir=None, notebook_name="notebook.ipynb"):
+        self.nb = nbf.new_notebook()
+        self.notebook_path = None
+        self.initialized = True
+        self.segmentation_output_content = {}  # 保存coder_agent 在 jupyter 中执行的 output 结果内容
+        # {
+        #     "eda": {
+        #     }
+        # }
+        self.current_segmentation: str = ""
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(self):
-        if not hasattr(self, "initialized"):
-            self.nb = nbf.new_notebook()
-            self.notebook_path = None
-            self.initialized = True
-            self.segmentation_output_content = {}  # 保存coder_agent 在 jupyter 中执行的 output 结果内容
-            # {
-            #     "eda": {
-            #     }
-            # }
-            self.current_segmentation: str = ""
+        self.init_notebook(work_dir, notebook_name)
 
     def init_notebook(self, work_dir=None, notebook_name="notebook.ipynb"):
         """初始化notebook路径
@@ -117,10 +111,3 @@ class NotebookSerializer:
 
     def get_notebook_output_content(self, segmentation):
         return self.segmentation_output_content[segmentation]
-
-
-# 创建全局单例实例
-notebook_serializer = NotebookSerializer()
-
-# 导出实例
-__all__ = ["notebook_serializer"]
