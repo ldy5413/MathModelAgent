@@ -6,7 +6,14 @@ import time
 
 
 class BaseModel:
-    def __init__(self, api_key: str, model: str, base_url: str, data_reacorder):
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        base_url: str,
+        data_reacorder,
+        message_queue,
+    ):
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
@@ -14,6 +21,7 @@ class BaseModel:
         self.chat_count = 0
         self.max_tokens: int | None = None  # 添加最大token数限制
         self.data_recorder = data_reacorder
+        self.message_queue = message_queue
 
     def chat(
         self,
@@ -76,13 +84,40 @@ class BaseModel:
             if tool_call.function.name == "execute_code":
                 code = json.loads(tool_call.function.arguments)["code"]
 
+        if code == "":
+            self.send_message(
+                agent_name, completion.choices[0].message.content, "writing"
+            )
+        else:
+            self.send_message(
+                agent_name, completion.choices[0].message.content + code, "coding"
+            )
+
         RichPrinter.print_agent_msg(
             completion.choices[0].message.content + code, agent_name=agent_name
         )
         log.debug(completion)
 
+    def send_message(self, agent_name, message, status=None):
+        if self.message_queue:
+            msg = {
+                "agent": agent_name,
+                "content": message,
+                "status": status,
+                "timestamp": time.time(),
+            }
+            print(f"发送消息: {msg}")  # 调试输出
+            self.message_queue.put(msg)
+
 
 class DeepSeekModel(BaseModel):
-    def __init__(self, api_key: str, model: str, base_url: str, data_recorder):
-        super().__init__(api_key, model, base_url, data_recorder)
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        base_url: str,
+        data_recorder,
+        message_queue,
+    ):
+        super().__init__(api_key, model, base_url, data_recorder, message_queue)
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
