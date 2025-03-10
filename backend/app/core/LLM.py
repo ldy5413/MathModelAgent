@@ -5,7 +5,7 @@ from app.utils.logger import log
 import time
 from app.schemas.response import AgentMessage
 from app.utils.enums import AgentType
-from app.main import redis_async_client
+from app.utils.redis_client import redis_async_client
 
 
 class LLM:
@@ -15,7 +15,6 @@ class LLM:
         model: str,
         base_url: str,
         data_reacorder,
-        message_queue,
         task_id: str,
     ):
         self.api_key = api_key
@@ -25,7 +24,6 @@ class LLM:
         self.chat_count = 0
         self.max_tokens: int | None = None  # 添加最大token数限制
         self.data_recorder = data_reacorder
-        self.message_queue = message_queue
         self.task_id = task_id
 
     def chat(
@@ -105,9 +103,6 @@ class LLM:
         )
         print(f"发送消息: {agent_msg.model_dump_json()}")  # 调试输出
 
-        if self.message_queue:
-            self.message_queue.put(agent_msg)
-
         self._push_to_websocket(agent_msg)
 
     def _push_to_websocket(self, agent_msg: AgentMessage):
@@ -125,9 +120,6 @@ class DeepSeekModel(LLM):
         base_url: str,
         task_id: str,
         data_recorder,
-        message_queue,
     ):
-        super().__init__(
-            api_key, model, base_url, data_recorder, message_queue, task_id
-        )
+        super().__init__(api_key, model, base_url, data_recorder, task_id)
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)

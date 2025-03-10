@@ -59,9 +59,7 @@ class SolutionWorkFlow(WorkFlow):
 
 # Parallel : 并行完成
 class WriteWorkFlow(WorkFlow):
-    def __init__(
-        self, model: LLM, user_input: UserInput, user_output: UserOutput
-    ):
+    def __init__(self, model: LLM, user_input: UserInput, user_output: UserOutput):
         super().__init__(user_input, user_output)
         self.model = model
 
@@ -74,8 +72,8 @@ class WriteWorkFlow(WorkFlow):
                 model=self.model,
                 comp_template=self.user_input.get_comp_template(),
                 format_output=self.user_input.get_format_output(),
-                user_output=self.user_output
-                )
+                user_output=self.user_output,
+            )
             writer_response = writer_agent.run(value)
             self.user_output.set_res(key, writer_response)
         log.info(self.user_output.get_res())

@@ -1,9 +1,0 @@
-{
-    "CoderAgent": {
-        "completion_tokens": 566,
-        "prompt_tokens": 697,
-        "total_tokens": 1263,
-        "chat_count": 1,
-        "cost": 0.0001263
-    }
-}

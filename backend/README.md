@@ -1,0 +1,1 @@
+ENV=DEV uvicorn app.main:app --reload

@@ -2,22 +2,21 @@ from app.models.user_input import UserInput
 from app.models.user_output import UserOutput
 from app.core.Agents import CoderAgent
 from app.core.WorkFlow import SolutionWorkFlow, WriteWorkFlow
-from config.config import settings
+from app.config.config import settings
 
 
 class Task:
-    def __init__(self, task_id: str, base_dir: str, work_dirs: dict, llm=None):
+    def __init__(self, task_id: str, dirs: dict, llm=None):
         self.task_id: str = task_id
-        self.base_dir = base_dir
-        self.work_dirs = work_dirs
+        self.dirs = dirs
         self.llm = llm
 
     def run(self, user_input: UserInput, data_recorder) -> UserOutput:
-        user_output = UserOutput(self.work_dirs, data_recorder=data_recorder)
+        user_output = UserOutput(self.dirs, data_recorder=data_recorder)
 
         coder_agent = CoderAgent(
             self.llm,
-            self.work_dirs["jupyter"],
+            self.dirs["jupyter"],
             max_chat_turns=settings.MAX_CHAT_TURNS,
             max_retries=settings.MAX_RETRIES,
             user_output=user_output,

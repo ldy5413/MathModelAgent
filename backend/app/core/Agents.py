@@ -6,7 +6,7 @@ from app.utils.common_utils import get_current_files
 from app.utils.enums import CompTemplate, FormatOutPut
 from app.utils.logger import log
 from app.utils.RichPrinter import RichPrinter
-from config.config import settings
+from app.config.config import settings
 
 functions = [
     {
@@ -165,9 +165,9 @@ Note: If the user uploads a file, you will receive a system message "User upload
         RichPrinter.agent_start(self.__class__.__name__)
         self.created_images.clear()  # 清空上一次任务的图片列表
         # TODO: jupyter 的notebook 分节
-        self.notebook_serializer.add_markdown_segmentation_to_notebook(
-            content=prompt, segmentation=subtask_title
-        )
+        # self.notebook_serializer.add_markdown_segmentation_to_notebook(
+        # content=prompt, segmentation=subtask_title
+        # )
 
         # 如果是第一次运行，则添加系统提示
         if self.is_first_run:

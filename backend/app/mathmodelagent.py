@@ -1,8 +1,7 @@
-import os
-from core.LLM import DeepSeekModel
-from utils.data_recorder import DataRecorder
-from utils.logger import log
-from config.config import settings
+from app.core.LLM import DeepSeekModel
+from app.utils.data_recorder import DataRecorder
+from app.utils.logger import log
+from app.config.config import settings
 from app.models.task import Task
 from app.models.user_output import UserOutput
 from app.models.user_input import UserInput
@@ -11,14 +10,14 @@ from app.utils.common_utils import get_config_template
 
 
 class MathModelAgent:
-    def __init__(self, problem: Problem, files_path: str):
+    def __init__(self, problem: Problem, dirs: dict):
         self.problem = problem
-        self.files_path = files_path
+        self.dirs = dirs
 
     def start(self):
         log.set_console_level("WARNING")
-        log.init(self.files_path["log"])
-        data_recorder = DataRecorder(self.files_path["log"])
+        log.init(self.dirs["log"])
+        data_recorder = DataRecorder(self.dirs["log"])
 
         # 加载配置文件
         deepseek_model = DeepSeekModel(
@@ -32,7 +31,7 @@ class MathModelAgent:
         user_input = UserInput(
             comp_template=self.problem.comp_template,
             format_output=self.problem.format_output,
-            data_folder_path=self.files_path["data"],
+            data_folder_path=self.dirs["data"],
             bg_ques_all=self.problem.ques_all,
             model=deepseek_model,
             init_with_llm=True,  # 使用LLM初始化
@@ -42,8 +41,7 @@ class MathModelAgent:
 
         task = Task(
             task_id=self.problem.task_id,
-            base_dir=self.files_path["base"],
-            work_dirs=self.files_path["work"],
+            dirs=self.dirs,
             llm=deepseek_model,
         )
 

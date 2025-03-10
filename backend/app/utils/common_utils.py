@@ -36,9 +36,13 @@ def create_work_directories(task_id: str):
         "res": os.path.join(base_dir, "res"),
     }
 
-    # 创建所需目录
-    for dir_path in dirs.values():
-        os.makedirs(dir_path, exist_ok=True)
+    # 检查目录是否已存在
+    if not os.path.exists(base_dir):
+        # 创建所需目录
+        for dir_path in dirs.values():
+            os.makedirs(dir_path, exist_ok=True)
+    else:
+        print(f"目录已存在: {base_dir}")
 
     return base_dir, dirs
 
@@ -94,4 +98,4 @@ def simple_chat(model: LLM, history: list) -> str:
 
 def get_config_template(comp_template: CompTemplate) -> dict:
     if comp_template == CompTemplate.CHINA:
-        return load_toml(os.path.join("config", "md_template.toml"))
+        return load_toml(os.path.join("app", "config", "md_template.toml"))

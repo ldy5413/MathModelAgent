@@ -1,11 +1,15 @@
-import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import (
+    FastAPI,
+    WebSocket,
+    WebSocketDisconnect,
+    UploadFile,
+    File,
+    BackgroundTasks,
+)
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import redis
-import redis.asyncio as aioredis
+from app.utils.redis_client import redis_client, redis_async_client, REDIS_URL
 from celery import Celery
-import redis.client
 from app.schemas.request import Problem
 from app.schemas.response import AgentMessage
 from app.utils.connection import manager
@@ -28,13 +32,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 配置 Redis
-REDIS_URL = "redis://localhost:6379/0"
-redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-redis_async_client = aioredis.Redis.from_url(REDIS_URL)
-
-# 配置 Celery
-celery = Celery("tasks", broker=REDIS_URL, backend=REDIS_URL)
 
 PROJECT_FOLDER = "./projects"
 os.makedirs(PROJECT_FOLDER, exist_ok=True)
@@ -69,18 +66,19 @@ async def upload_files(files: list[UploadFile] = File(...)):
 
 
 @app.post("/modeling/")
-async def modeling(problem: Problem):
+async def modeling(problem: Problem, background_tasks: BackgroundTasks):
     task_id = problem.task_id
+    dirs = None
     if task_id and redis_client.exists(f"task_id:{task_id}"):
-        # 存在任务
-        files_path = os.path.join(PROJECT_FOLDER, task_id)
-    else:
-        task_id = create_task_id()
-        files_path = None  # 不依赖数据集
+        # 存在任务，创建完整的目录结构
+        base_dir, dirs = create_work_directories(task_id)
+    # else:
+    #     task_id = create_task_id()
+    #     files_path = None  # 不依赖数据集
 
-    # 发送任务到 celery
-    celery_task = run_modeling_task.apply_async(args=[problem, files_path])
-
+    print(f"Adding background task for task_id: {task_id}")
+    # 将任务添加到后台执行
+    background_tasks.add_task(run_modeling_task_async, problem.model_dump(), dirs)
     return {"task_id": task_id, "status": "processing"}
 
 
@@ -96,13 +94,14 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
     # 订阅指定频道
     await pubsub.subscribe(f"task:{task_id}:messages")
+    print(f"Subscribed to Redis channel: task:{task_id}:messages")  # 确认订阅频道
     try:
         while True:
             msg = await pubsub.get_message(ignore_subscribe_messages=True)
             if msg:
                 try:
                     # 转换为AgentMessage确保格式正确
-                    agent_msg = AgentMessage.model_validate_json(msg)
+                    agent_msg = AgentMessage.model_validate_json(msg["data"])
                     await manager.send_personal_message_json(
                         agent_msg.model_dump(), websocket
                     )
@@ -111,15 +110,30 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
                     await manager.send_personal_message(
                         "Error parsing message", websocket
                     )
-            else:
-                print("No status available")
-                await manager.send_personal_message("No status available", websocket)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
 
-@celery.task
-def run_modeling_task(problem: Problem, files_path: str):
-    mathmodelagent = MathModelAgent(problem, files_path)
+async def run_modeling_task_async(problem: dict, dirs: dict):
+    print("run_modeling_task_async")
+
+    # 测试发送
+    from app.utils.enums import AgentType
+
+    agent_msg = AgentMessage(
+        agent_type=AgentType.CODER,
+        code="processing",
+        content="processing",
+    )
+
+    await redis_async_client.publish(
+        "task:20250310-201006-401cdc9a:messages",
+        agent_msg.model_dump_json(),
+    )
+
+    # 将问题字典转换为Problem对象
+    problem = Problem(**problem)
+    mathmodelagent = MathModelAgent(problem, dirs)
+
     mathmodelagent.start()
     return {"task_id": problem.task_id, "result": "success"}
