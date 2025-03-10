@@ -1,32 +1,19 @@
 import asyncio
-import uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from dotenv import load_dotenv
 import redis
-from pydantic_settings import BaseSettings
+import redis.asyncio as aioredis
 from celery import Celery
+import redis.client
 from app.schemas.request import Problem
+from app.schemas.response import AgentMessage
+from app.utils.connection import manager
+from app.config.config import settings
+from app.utils.common_utils import create_task_id, create_work_directories
+from app.mathmodelagent import MathModelAgent
 
 app = FastAPI()
-
-
-# 步骤 ①：读取命令行参数或默认环境
-env = os.getenv("ENV", "dev")  # 默认 dev 模式
-
-# 步骤 ②：加载对应的 .env 文件
-load_dotenv(f".env.{env}")
-
-
-# 步骤 ③：定义配置模型
-class Settings(BaseSettings):
-    environment: str = "dev"
-    database_url: str
-    debug: bool = False
-
-
-settings = Settings()
 # origins = [
 #     "http://localhost:3000",  # 前端开发服务器
 #     "http://localhost:5173",  # Vite 开发服务器备选端口
@@ -44,34 +31,13 @@ app.add_middleware(
 # 配置 Redis
 REDIS_URL = "redis://localhost:6379/0"
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+redis_async_client = aioredis.Redis.from_url(REDIS_URL)
 
 # 配置 Celery
 celery = Celery("tasks", broker=REDIS_URL, backend=REDIS_URL)
 
-UPLOAD_FOLDER = "./uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-
-manager = ConnectionManager()
+PROJECT_FOLDER = "./projects"
+os.makedirs(PROJECT_FOLDER, exist_ok=True)
 
 
 @app.get("/")
@@ -82,67 +48,78 @@ async def root():
 @app.get("/config")
 async def config():
     return {
-        "environment": settings.environment,
-        "database": settings.database_url,
-        "debug": settings.debug,
+        "environment": settings.ENV,
+        "deepseek_model": settings.DEEPSEEK_MODEL,
+        "deepseek_base_url": settings.DEEPSEEK_BASE_URL,
+        "max_chat_turns": settings.MAX_CHAT_TURNS,
+        "max_retries": settings.MAX_RETRIES,
     }
 
 
 @app.post("/upload_files/")
 async def upload_files(files: list[UploadFile] = File(...)):
-    task_id = str(uuid.uuid4())
-    file_path = os.path.join(UPLOAD_FOLDER, task_id)
-    os.makedirs(file_path, exist_ok=True)
+    task_id = create_task_id()
+    base_dir, dirs = create_work_directories(task_id)
     for file in files:
-        data_file_path = os.path.join(file_path, file.filename)
+        data_file_path = os.path.join(dirs["data"], file.filename)
         with open(data_file_path, "wb") as f:
             f.write(file.file.read())
-    redis_client.set(f"file:{task_id}", file_path)
+    redis_client.set(f"task_id:{task_id}", task_id)
     return {"task_id": task_id, "message": "Files uploaded successfully"}
 
 
 @app.post("/modeling/")
 async def modeling(problem: Problem):
     task_id = problem.task_id
-    ques = problem.ques
-    if task_id and redis_client.exists(f"file:{task_id}"):
-        file_path = redis_client.get(f"file:{task_id}")
+    if task_id and redis_client.exists(f"task_id:{task_id}"):
+        # 存在任务
+        files_path = os.path.join(PROJECT_FOLDER, task_id)
     else:
-        task_id = str(uuid.uuid4())
-        file_path = None  # 不依赖数据集
+        task_id = create_task_id()
+        files_path = None  # 不依赖数据集
 
     # 发送任务到 celery
-    celery_task = run_modeling_task.apply_async(args=[task_id, file_path, ques])
+    celery_task = run_modeling_task.apply_async(args=[problem, files_path])
 
     return {"task_id": task_id, "status": "processing"}
 
 
 @app.websocket("/{task_id}")
 async def websocket_endpoint(websocket: WebSocket, task_id: str):
+    if not redis_client.exists(f"task_id:{task_id}"):
+        await websocket.close(code=1008, reason="Task not found")
+        return
     print(f"WebSocket connected for task: {task_id}")
+
     await manager.connect(websocket)
+    pubsub = redis_async_client.pubsub()
+
+    # 订阅指定频道
+    await pubsub.subscribe(f"task:{task_id}:messages")
     try:
         while True:
-            status = redis_client.get(f"status:{task_id}")
-            if status:
-                print(f"Status: {status}")
-                await manager.send_personal_message(f"You status: {status}", websocket)
+            msg = await pubsub.get_message(ignore_subscribe_messages=True)
+            if msg:
+                try:
+                    # 转换为AgentMessage确保格式正确
+                    agent_msg = AgentMessage.model_validate_json(msg)
+                    await manager.send_personal_message_json(
+                        agent_msg.model_dump(), websocket
+                    )
+                except Exception as e:
+                    print(f"Error parsing message: {e}")
+                    await manager.send_personal_message(
+                        "Error parsing message", websocket
+                    )
             else:
                 print("No status available")
                 await manager.send_personal_message("No status available", websocket)
-            await asyncio.sleep(1)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
 
 @celery.task
-def run_modeling_task(task_id: str, file_path: str, ques: str):
-    redis_client.set(f"status:{task_id}", "Starting modeling...")
-
-    # 模拟计算
-    import time
-
-    time.sleep(20)  # 假设建模过程需要时间
-    redis_client.set(f"status:{task_id}", "Modeling completed")
-
-    return {"task_id": task_id, "result": "success"}
+def run_modeling_task(problem: Problem, files_path: str):
+    mathmodelagent = MathModelAgent(problem, files_path)
+    mathmodelagent.start()
+    return {"task_id": problem.task_id, "result": "success"}
