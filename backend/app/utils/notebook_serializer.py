@@ -2,7 +2,6 @@ import nbformat
 from nbformat import v4 as nbf
 import ansi2html
 import os
-import aiofiles  # 需要添加这个导入
 
 
 class NotebookSerializer:
@@ -35,27 +34,27 @@ class NotebookSerializer:
             # 在jupyter工作目录下创建notebook文件
             self.notebook_path = os.path.join(work_dir, notebook_name)
 
-            if os.path.exists(self.notebook_path):
-                raise FileExistsError(
-                    f"文件 {self.notebook_path} 已存在。请选择其他文件名。"
-                )
+            # if os.path.exists(self.notebook_path):
+            #     raise FileExistsError(
+            #         f"文件 {self.notebook_path} 已存在。请选择其他文件名。"
+            #     )
 
     def ansi_to_html(self, ansi_text):
         converter = ansi2html.Ansi2HTMLConverter()
         html_text = converter.convert(ansi_text)
         return html_text
 
-    async def write_to_notebook(self):
+    def write_to_notebook(self):
         if self.notebook_path:
-            async with aiofiles.open(self.notebook_path, "w", encoding="utf-8") as f:
-                await f.write(nbformat.writes(self.nb))
+            with open(self.notebook_path, "w", encoding="utf-8") as f:
+                f.write(nbformat.writes(self.nb))
 
-    async def add_code_cell_to_notebook(self, code):
+    def add_code_cell_to_notebook(self, code):
         code_cell = nbf.new_code_cell(source=code)
         self.nb["cells"].append(code_cell)
-        await self.write_to_notebook()
+        self.write_to_notebook()
 
-    async def add_code_cell_output_to_notebook(self, output):
+    def add_code_cell_output_to_notebook(self, output):
         """添加代码单元格输出
 
         Args:
@@ -72,9 +71,9 @@ class NotebookSerializer:
             output_type="display_data", data={"text/html": html_content}
         )
         self.nb["cells"][-1]["outputs"].append(cell_output)
-        await self.write_to_notebook()
+        self.write_to_notebook()
 
-    async def add_code_cell_error_to_notebook(self, error):
+    def add_code_cell_error_to_notebook(self, error):
         nbf_error_output = nbf.new_output(
             output_type="error",
             ename="Error",
@@ -82,23 +81,23 @@ class NotebookSerializer:
             traceback=[error],
         )
         self.nb["cells"][-1]["outputs"].append(nbf_error_output)
-        await self.write_to_notebook()
+        self.write_to_notebook()
 
-    async def add_image_to_notebook(self, image, mime_type):
+    def add_image_to_notebook(self, image, mime_type):
         image_output = nbf.new_output(
             output_type="display_data", data={mime_type: image}
         )
         self.nb["cells"][-1]["outputs"].append(image_output)
-        await self.write_to_notebook()
+        self.write_to_notebook()
 
-    async def add_markdown_to_notebook(self, content, title=None):
+    def add_markdown_to_notebook(self, content, title=None):
         if title:
             content = "##### " + title + ":\n" + content
         markdown_cell = nbf.new_markdown_cell(content)
         self.nb["cells"].append(markdown_cell)
-        await self.write_to_notebook()
+        self.write_to_notebook()
 
-    async def add_markdown_segmentation_to_notebook(self, content, segmentation):
+    def add_markdown_segmentation_to_notebook(self, content, segmentation):
         """添加markdown分段并初始化对应的output内容存储
 
         Args:
@@ -108,7 +107,7 @@ class NotebookSerializer:
         self.current_segmentation = segmentation
         # 初始化该分段的output内容
         self.segmentation_output_content[segmentation] = ""
-        await self.add_markdown_to_notebook(content, segmentation)
+        self.add_markdown_to_notebook(content, segmentation)
 
     def get_notebook_output_content(self, segmentation):
         return self.segmentation_output_content[segmentation]

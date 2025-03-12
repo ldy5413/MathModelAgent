@@ -8,8 +8,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from app.utils.redis_client import redis_client, redis_async_client, REDIS_URL
-from celery import Celery
+from app.utils.redis_client import redis_client, redis_async_client
 from app.schemas.request import Problem
 from app.schemas.response import AgentMessage
 from app.utils.connection import manager
@@ -33,7 +32,7 @@ app.add_middleware(
 )
 
 
-PROJECT_FOLDER = "./projects"
+PROJECT_FOLDER = "./project"
 os.makedirs(PROJECT_FOLDER, exist_ok=True)
 
 
@@ -127,7 +126,7 @@ async def run_modeling_task_async(problem: dict, dirs: dict):
     )
 
     await redis_async_client.publish(
-        "task:20250310-201006-401cdc9a:messages",
+        f"task:{problem['task_id']}:messages",
         agent_msg.model_dump_json(),
     )
 

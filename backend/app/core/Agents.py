@@ -7,6 +7,7 @@ from app.utils.enums import CompTemplate, FormatOutPut
 from app.utils.logger import log
 from app.utils.RichPrinter import RichPrinter
 from app.config.config import settings
+from app.utils.notebook_serializer import NotebookSerializer
 
 functions = [
     {
@@ -106,15 +107,18 @@ class CoderAgent(Agent):  # 同样继承自Agent类
     def __init__(
         self,
         model: LLM,
-        work_dir: str,  # 工作目录
+        dirs: dict,  # 工作目录
         max_chat_turns: int = settings.MAX_CHAT_TURNS,  # TODO: 配置文件
         max_retries: int = settings.MAX_RETRIES,  # 重试次数
         user_output: UserOutput = None,
         task_id: str = None,
     ) -> None:
         super().__init__(model, max_chat_turns, user_output)
-        self.work_dir = work_dir
-        self.code_interpreter = E2BCodeInterpreter(work_dir, task_id)
+        self.dirs = dirs
+        self.notebook_serializer = NotebookSerializer(dirs["jupyter"])
+        self.code_interpreter = E2BCodeInterpreter(
+            dirs, task_id, self.notebook_serializer
+        )
 
         self.max_retries = max_retries
         self.is_first_run = True
@@ -165,9 +169,12 @@ Note: If the user uploads a file, you will receive a system message "User upload
         RichPrinter.agent_start(self.__class__.__name__)
         self.created_images.clear()  # 清空上一次任务的图片列表
         # TODO: jupyter 的notebook 分节
-        # self.notebook_serializer.add_markdown_segmentation_to_notebook(
-        # content=prompt, segmentation=subtask_title
-        # )
+        self.notebook_serializer.add_markdown_segmentation_to_notebook(
+            content=prompt, segmentation=subtask_title
+        )
+        self.code_interpreter.add_segmentation(subtask_title)
+
+
 
         # 如果是第一次运行，则添加系统提示
         if self.is_first_run:
@@ -239,7 +246,7 @@ Note: If the user uploads a file, you will receive a system message "User upload
                             content_to_display,
                             error_occurred,
                             error_message,
-                        ) = self.code_interpreter.jupyter_kernel.execute_code(code)
+                        ) = self.code_interpreter.execute_code(code)
 
                         # 添加工具执行结果
                         self.append_chat_history(
@@ -342,11 +349,16 @@ If the task is complete, please provide a summary of what was accomplished about
         """获取当前任务创建的图片列表"""
         return self.created_images
 
+    # TODO: 修改在E2B 中获取
     def _update_created_images(self) -> None:
         """更新创建的图片列表"""
-        current_images = set(get_current_files(self.work_dir, "image"))
+        current_images = set(get_current_files(self.dirs["work_dir"], "image"))
         previous_images = set(self.created_images)
         self.created_images = list(current_images - previous_images)
+
+    def get_notebook_serializer(self) -> NotebookSerializer:
+        """获取notebook序列化器"""
+        return self.notebook_serializer
 
 
 # 长文本

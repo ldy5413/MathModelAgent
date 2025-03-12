@@ -106,10 +106,17 @@ class LLM:
         self._push_to_websocket(agent_msg)
 
     def _push_to_websocket(self, agent_msg: AgentMessage):
-        redis_async_client.publish(
-            f"task:{self.task_id}:messages",
-            agent_msg.model_dump_json(),
-        )
+        # 将同步方法改为异步方法
+        async def _async_push():
+            await redis_async_client.publish(
+                f"task:{self.task_id}:messages",
+                agent_msg.model_dump_json(),
+            )
+
+        # 在同步上下文中运行异步任务
+        import asyncio
+
+        asyncio.create_task(_async_push())
 
 
 class DeepSeekModel(LLM):

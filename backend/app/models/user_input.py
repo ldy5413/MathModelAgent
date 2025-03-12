@@ -124,12 +124,9 @@ class UserInput:
         return f"choice: {self.comp_template}, format_out_put: {self.format_output}, data_folder_path: {self.data_folder_path}, bg_ques_all: {self.bg_ques_all}, model: {self.model}, ques_count: {self.ques_count}, questions: {self.questions}"
 
     def get_data_path(self) -> list[str]:
-        """获取数据集完整路径"""
-        data_folder_path = self.get_data_folder_path() # "" ./project/sample_data
+        data_folder_path = self.get_data_folder_path()  # "" ./project/sample_data
         files = os.listdir(data_folder_path)
-        full_paths = [os.path.abspath(os.path.join(data_folder_path, file)) for file in files]
-        log.info(f"full_paths: {full_paths}")
-        return full_paths
+        return files
 
     def get_solution_flows(self):
         questions_quesx = self.get_questions_quesx()
@@ -178,20 +175,21 @@ class UserInput:
         questions_quesx_keys = self.get_questions_quesx_keys()
         # TODO： 小标题编号
         # 题号最多6题
+        bgc = self.get_questions()['background']
         quesx_writer_prompt = {
             key: f"""
-                问题背景{self.get_questions()["background"]},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template[key]}
+                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template[key]}
             """
             for key in questions_quesx_keys
         }
 
         writer_prompt = {
             "eda": f"""
-                问题背景{self.get_questions()["background"]},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template["eda"]}
+                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template["eda"]}
             """,
             **quesx_writer_prompt,
             "sensitivity_analysis": f"""
-                问题背景{self.get_questions()["background"]},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template["sensitivity_analysis"]}
+                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template["sensitivity_analysis"]}
             """,
         }
 

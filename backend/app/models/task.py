@@ -16,7 +16,7 @@ class Task:
 
         coder_agent = CoderAgent(
             self.llm,
-            self.dirs["jupyter"],
+            self.dirs,
             max_chat_turns=settings.MAX_CHAT_TURNS,
             max_retries=settings.MAX_RETRIES,
             user_output=user_output,

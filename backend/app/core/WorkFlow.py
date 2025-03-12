@@ -1,6 +1,5 @@
 from app.core.Agents import WriterAgent, CoderAgent
 from app.core.LLM import LLM
-from app.models import user_output
 from app.utils.logger import log
 from app.models.user_input import UserInput
 from app.models.user_output import UserOutput
@@ -23,8 +22,6 @@ class SolutionWorkFlow(WorkFlow):
     ):
         super().__init__(user_input, user_output)
         self.coder_agent = coder_agent
-        self.create_images: list[str] = []
-        self.current_images: list[str] = []
 
     def execute(self) -> dict:
         RichPrinter.workflow_start()
