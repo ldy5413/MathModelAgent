@@ -1,18 +1,16 @@
-# from .jupyter_backend import JupyterKernel
 import os
+import re
 from e2b_code_interpreter import Sandbox
 from app.schemas.response import CodeExecutionResult, AgentMessage
 from app.utils.enums import AgentType
 from app.main import redis_async_client
 from app.utils.notebook_serializer import NotebookSerializer
+from app.utils.logger import log
 
-# class CodeInterpreter:
-#     def __init__(
-#         self, work_dir: str, notebook_serializer
-#     ):  # project / work_dir / task_id / jupyter
-#         self.jupyter_kernel = JupyterKernel(
-#             work_dir=work_dir, notebook_serializer=notebook_serializer
-#         )
+
+def delete_color_control_char(string):
+    ansi_escape = re.compile(r"(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]")
+    return ansi_escape.sub("", string)
 
 
 class E2BCodeInterpreter:
@@ -24,12 +22,14 @@ class E2BCodeInterpreter:
         self.task_id = task_id
         self.notebook_serializer = notebook_serializer
         # 保存coder_agent 在 jupyter 中执行的 output 结果内容
-        self.current_segmentation: str = ""
-        self.segmentation_output :dict[str,str] = {}
+        self.section_output: dict[str, dict[str, list[str]]] = {}
         # {
         #     "eda": {
-        #     }
+        #         "content":["xxxx",],
+        #         "images":["aa.png"]
+        #     },
         # }
+        self.created_images: list[str] = []  # 当前求解创建的图片
         self._pre_execute_code()
         self._upload_all_files()
 
@@ -50,16 +50,15 @@ class E2BCodeInterpreter:
         self.execute_code(init_code)
 
     def execute_code(self, code: str):
+        print("执行代码")
         self.notebook_serializer.add_code_cell_to_notebook(code)
 
-
-        text_to_gpt = []
-        content_to_display = {}  # 发送给前端
-        error_occurred = False
-        error_message = ""
+        text_to_gpt: list[str] = []
+        content_to_display: dict[str, str] = {}  # 发送给前端
+        error_occurred: bool = False
+        error_message: str = ""
 
         execution = self.sbx.run_code(code)
-
         # 处理错误
         if execution.error:
             error_occurred = True
@@ -70,7 +69,7 @@ class E2BCodeInterpreter:
                 + "\n"
                 + execution.error.traceback
             )
-            text_to_gpt.append(error_message)
+            text_to_gpt.append(delete_color_control_char(error_message))
             content_to_display["error"] = error_message
 
         # 处理标准输出
@@ -103,7 +102,6 @@ class E2BCodeInterpreter:
         for val in content_to_display.values():
             self.add_segmentation(val)
 
-
         self._push_to_websocket(content_to_display, error_message)
         return (
             "\n".join(text_to_gpt),
@@ -112,7 +110,7 @@ class E2BCodeInterpreter:
             error_message,
         )
 
-    def _push_to_websocket(self, content_to_display, error_message):
+    async def _push_to_websocket(self, content_to_display, error_message):
         code_execution_result = CodeExecutionResult(
             content=content_to_display,
             error=error_message,
@@ -122,19 +120,33 @@ class E2BCodeInterpreter:
             code_result=code_execution_result,
         )
         print(f"发送消息: {agent_msg.model_dump_json()}")  # 调试输出
-        redis_async_client.publish(
+        await redis_async_client.publish(
             f"task:{self.task_id}:messages",
             agent_msg.model_dump_json(),
         )
 
-    def add_segmentation(self,seg):
-        self.current_segmentation = seg
-        # 初始化该分段的output内容
-        self.segmentation_output[seg] = ""
+    def get_created_images(self, section: str) -> list[str]:
+        """获取当前 section 创建的图片列表"""
+        for file in self.sbx.files.list("./"):
+            if file.name.endswith(".png") or file.name.endswith(".jpg"):
+                self.section_output[section]["images"].append(file.name)
 
-    def add_segmentation_output(self,output:str):
-        if self.current_segmentation:
-            # 确保键存在
-            if self.current_segmentation not in self.segmentation_output:
-                self.segmentation_output[self.current_segmentation] = ""
-            self.segmentation_output[self.current_segmentation] += output
+        self.created_images = list(
+            set(self.section_output[section]["images"]) - set(self.created_images)
+        )
+        return self.created_images
+
+    def add_section(self, section_name: str) -> None:
+        """确保添加的section结构正确"""
+
+        if section_name not in self.section_output:
+            self.section_output[section_name] = {"content": [], "images": []}
+
+    def add_content(self, section: str, text: str) -> None:
+        """向指定section添加文本内容"""
+        self.add_section(section)
+        self.section_output[section]["content"].append(text)
+
+    def get_code_output(self, section: str) -> str:
+        """获取指定section的代码输出"""
+        return "\n".join(self.section_output[section]["content"])

@@ -14,7 +14,7 @@ def create_task_id() -> str:
     return f"{timestamp}-{random_hash}"
 
 
-def create_work_directories(task_id: str):
+def create_work_directories(task_id: str) -> tuple[str, dict]:
     """
     summary
 

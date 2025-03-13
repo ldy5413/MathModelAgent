@@ -34,9 +34,7 @@ class SolutionWorkFlow(WorkFlow):
 
             # TODO: 是否可以不需要coder_response
             writer_prompt = self.user_input.get_writer_prompt(
-                key,
-                coder_response,
-                notebook_serializer=self.coder_agent.get_notebook_serializer(),
+                key, coder_response, self.coder_agent.code_interpreter
             )
             # TODO: 自定义 writer_agent mode llm
             writer_agent = WriterAgent(
@@ -46,7 +44,10 @@ class SolutionWorkFlow(WorkFlow):
                 user_output=self.user_output,
             )
             writer_response = writer_agent.run(
-                writer_prompt, available_images=self.coder_agent.get_created_images()
+                writer_prompt,
+                available_images=self.coder_agent.code_interpreter.get_created_images(
+                    key
+                ),
             )
             self.user_output.set_res(key, writer_response)
         log.info(self.user_output.get_res())

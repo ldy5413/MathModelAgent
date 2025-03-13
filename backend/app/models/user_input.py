@@ -1,4 +1,5 @@
 from app.models.user_output import UserOutput
+from app.tools.code_interpreter import E2BCodeInterpreter
 from app.utils.enums import CompTemplate, FormatOutPut
 from app.core.LLM import LLM
 from app.utils.logger import log
@@ -157,7 +158,7 @@ class UserInput:
         return flows
 
     def get_writer_prompt(
-        self, key: str, coder_response: str, notebook_serializer
+        self, key: str, coder_response: str, code_interpreter: E2BCodeInterpreter
     ) -> str:
         """根据不同的key生成对应的writer_prompt
 
@@ -168,28 +169,28 @@ class UserInput:
         Returns:
             str: 生成的writer_prompt
         """
+        code_output = code_interpreter.get_code_output(key)
 
-        notebook_output = notebook_serializer.get_notebook_output_content(key)
         # TODO: 结果{coder_response} 是否需要
         # TODO: 将当前产生的文件，路径发送给 writer_agent
         questions_quesx_keys = self.get_questions_quesx_keys()
         # TODO： 小标题编号
         # 题号最多6题
-        bgc = self.get_questions()['background']
+        bgc = self.get_questions()["background"]
         quesx_writer_prompt = {
             key: f"""
-                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template[key]}
+                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{self.config_template[key]}
             """
             for key in questions_quesx_keys
         }
 
         writer_prompt = {
             "eda": f"""
-                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template["eda"]}
+                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{self.config_template["eda"]}
             """,
             **quesx_writer_prompt,
             "sensitivity_analysis": f"""
-                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{notebook_output},按照如下模板撰写：{self.config_template["sensitivity_analysis"]}
+                问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{self.config_template["sensitivity_analysis"]}
             """,
         }
 

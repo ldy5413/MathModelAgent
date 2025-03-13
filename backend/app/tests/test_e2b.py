@@ -1,33 +1,43 @@
-import sys
-import os
+import unittest
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from dotenv import load_dotenv
 
 from app.tools.code_interpreter import E2BCodeInterpreter
+from app.utils.common_utils import create_task_id, create_work_directories
+from app.utils.notebook_serializer import NotebookSerializer
 
 
-def test_e2b():
-    interpreter = E2BCodeInterpreter("./test_workspace")
-    text_to_gpt, content_to_display, error_occurred, error_message = (
-        interpreter.execute_code(
-            """
-print('hello world')
+class TestE2BCodeInterpreter(unittest.TestCase):
+
+    def setUp(self):
+        load_dotenv()
+        _,dirs =  create_work_directories("20250312-104132-d3625cab")
+        notebook =  NotebookSerializer(dirs['jupyter'])
+        self.code_interpreter = E2BCodeInterpreter(dirs, "20250312-104132-d3625cab", notebook)
+
+    def test_execute_code(self):
+        code = """
 import matplotlib.pyplot as plt
 import numpy as np
 
-x = np.linspace(0, 10, 100)
-y = np.sin(x)
-plt.plot(x, y)
-plt.show()
+# 生成数据
+x = np.linspace(0, 2 * np.pi, 100)  # x从0到2π，生成100个点
+y = np.sin(x)                       # 计算对应的sin(x)值
+
+# 绘图
+plt.figure(figsize=(8, 4))          # 设置画布大小
+plt.plot(x, y, label='y = sin(x)')  # 绘制曲线，并添加图例
+
+# 添加标签和标题
+plt.title("Simple Sine Function")
+plt.xlabel("x")
+plt.ylabel("y")
+
+# 添加网格和图例
+plt.grid(True)
+plt.legend()
+
+# 显示图像
+plt.show()    
 """
-        )
-    )
-
-    print("text_to_gpt", text_to_gpt)
-    print("content_to_display", content_to_display)
-    print("error_occurred", error_occurred)
-    print("error_message", error_message)
-
-
-if __name__ == "__main__":
-    test_e2b()
+        self.code_interpreter.execute_code(code)

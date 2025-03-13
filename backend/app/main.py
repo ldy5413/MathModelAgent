@@ -70,7 +70,7 @@ async def modeling(problem: Problem, background_tasks: BackgroundTasks):
     dirs = None
     if task_id and redis_client.exists(f"task_id:{task_id}"):
         # 存在任务，创建完整的目录结构
-        base_dir, dirs = create_work_directories(task_id)
+        _, dirs = create_work_directories(task_id)
     # else:
     #     task_id = create_task_id()
     #     files_path = None  # 不依赖数据集
@@ -115,24 +115,9 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
 async def run_modeling_task_async(problem: dict, dirs: dict):
     print("run_modeling_task_async")
-
-    # 测试发送
-    from app.utils.enums import AgentType
-
-    agent_msg = AgentMessage(
-        agent_type=AgentType.CODER,
-        code="processing",
-        content="processing",
-    )
-
-    await redis_async_client.publish(
-        f"task:{problem['task_id']}:messages",
-        agent_msg.model_dump_json(),
-    )
-
     # 将问题字典转换为Problem对象
     problem = Problem(**problem)
-    mathmodelagent = MathModelAgent(problem, dirs)
+    mathmodel_agent = MathModelAgent(problem, dirs)
 
-    mathmodelagent.start()
+    mathmodel_agent.start()
     return {"task_id": problem.task_id, "result": "success"}
