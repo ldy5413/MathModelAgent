@@ -12,6 +12,7 @@ dependencies = [
     "e2b-code-interpreter>=1.0.5",
     "fastapi[standard]>=0.115.8",
     "httpx[socks]>=0.28.1",
+    "icecream>=2.1.4",
     "jupyter-client>=8.6.3",
     "loguru>=0.7.3",
     "nbformat>=5.10.4",

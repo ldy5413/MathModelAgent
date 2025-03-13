@@ -49,12 +49,12 @@ class E2BCodeInterpreter:
         )
         self.execute_code(init_code)
 
-    def execute_code(self, code: str):
+    def execute_code(self, code: str) -> tuple[str, list[str, str], bool, str]:
         print("执行代码")
         self.notebook_serializer.add_code_cell_to_notebook(code)
 
         text_to_gpt: list[str] = []
-        content_to_display: dict[str, str] = {}  # 发送给前端
+        content_to_display: list[tuple[str, str]] = []  # 发送给前端
         error_occurred: bool = False
         error_message: str = ""
 
@@ -70,15 +70,15 @@ class E2BCodeInterpreter:
                 + execution.error.traceback
             )
             text_to_gpt.append(delete_color_control_char(error_message))
-            content_to_display["error"] = error_message
+            content_to_display.append(("error", error_message))
 
         # 处理标准输出
         if execution.logs.stdout:
             text_to_gpt.append(str(execution.logs.stdout))  # 确保转换为字符串
-            content_to_display["text"] = execution.logs.stdout
-            self.notebook_serializer.add_code_cell_output_to_notebook(
-                execution.logs.stdout
-            )
+            content_to_display.append(("text", execution.logs.stdout))
+            # self.notebook_serializer.add_code_cell_output_to_notebook(
+            # execution.logs.stdout
+            # )
 
         # 处理执行结果
         for res in execution.results:
@@ -90,18 +90,18 @@ class E2BCodeInterpreter:
             # 处理图片结果
             if res.png:
                 text_to_gpt.append("[image]")
-                content_to_display["image/png"] = res.png
+                content_to_display.append(("image/png", res.png))
                 self.notebook_serializer.add_image_to_notebook(res.png, "image/png")
 
             elif res.jpeg:
                 text_to_gpt.append("[image]")
-                content_to_display["image/jpeg"] = res.jpeg
+                content_to_display.append(("image/jpeg", res.jpeg))
                 self.notebook_serializer.add_image_to_notebook(res.jpeg, "image/jpeg")
 
         # 保存到分段内容
-        for val in content_to_display.values():
-            self.add_segmentation(val)
-
+        for val in content_to_display:
+            self.add_section(val[0])
+            self.add_content(val[0], val[1])
         self._push_to_websocket(content_to_display, error_message)
         return (
             "\n".join(text_to_gpt),

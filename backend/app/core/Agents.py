@@ -191,79 +191,79 @@ Note: If the user uploads a file, you will receive a system message "User upload
                 f"Failed to complete task after {self.max_retries} attempts. Last error: {last_error_message}"
             )
 
-        try:
-            while (
-                not task_completed
-                and retry_count < self.max_retries
-                and self.current_chat_turns < self.max_chat_turns
+            # try:
+        while (
+            not task_completed
+            and retry_count < self.max_retries
+            and self.current_chat_turns < self.max_chat_turns
+        ):
+            self.current_chat_turns += 1
+            response = self.model.chat(
+                history=self.chat_history,
+                tools=functions,
+                tool_choice="auto",
+                agent_name=self.__class__.__name__,
+            )
+
+            if (
+                hasattr(response.choices[0].message, "tool_calls")
+                and response.choices[0].message.tool_calls
             ):
-                self.current_chat_turns += 1
-                response = self.model.chat(
-                    history=self.chat_history,
-                    tools=functions,
-                    tool_choice="auto",
-                    agent_name=self.__class__.__name__,
-                )
+                tool_call = response.choices[0].message.tool_calls[0]
+                tool_id = tool_call.id
+                # TODO: json JSON解析时遇到了无效的转义字符
+                if tool_call.function.name == "execute_code":
+                    code = json.loads(tool_call.function.arguments)["code"]
+                    full_content = response.choices[0].message.content
+                    # 更新对话历史 - 添加助手的响应
+                    self.append_chat_history(
+                        {
+                            "role": "assistant",
+                            "content": full_content,
+                            "tool_calls": [
+                                {
+                                    "id": tool_id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": "execute_code",
+                                        "arguments": json.dumps({"code": code}),
+                                    },
+                                }
+                            ],
+                        }
+                    )
 
-                if (
-                    hasattr(response.choices[0].message, "tool_calls")
-                    and response.choices[0].message.tool_calls
-                ):
-                    tool_call = response.choices[0].message.tool_calls[0]
-                    tool_id = tool_call.id
-                    # TODO: json JSON解析时遇到了无效的转义字符
-                    if tool_call.function.name == "execute_code":
-                        code = json.loads(tool_call.function.arguments)["code"]
-                        full_content = response.choices[0].message.content
-                        # 更新对话历史 - 添加助手的响应
-                        self.append_chat_history(
-                            {
-                                "role": "assistant",
-                                "content": response.choices[0].message.content,
-                                "tool_calls": [
-                                    {
-                                        "id": tool_id,
-                                        "type": "function",
-                                        "function": {
-                                            "name": "execute_code",
-                                            "arguments": json.dumps({"code": code}),
-                                        },
-                                    }
-                                ],
-                            }
-                        )
+                    # 执行工具调用
+                    (
+                        text_to_gpt,
+                        content_to_display,
+                        error_occurred,
+                        error_message,
+                    ) = self.code_interpreter.execute_code(code)
+                    print(
+                        "==========================="
+                        f"text_to_gpt: {text_to_gpt},"
+                        f"content_to_display: {content_to_display},"
+                        f"error_occurred: {error_occurred},"
+                        f"error_message: {error_message}"
+                        "==========================="
+                    )
 
-                        # 执行工具调用
-                        (
-                            text_to_gpt,
-                            content_to_display,
-                            error_occurred,
-                            error_message,
-                        ) = self.code_interpreter.execute_code(code)
-                        print(
-                            "==========================="
-                            f"text_to_gpt: {text_to_gpt},"
-                            f"content_to_display: {content_to_display},"
-                            f"error_occurred: {error_occurred},"
-                            f"error_message: {error_message}"
-                            "==========================="
-                        )
+                    # 记录执行结果
 
-                        # 记录执行结果
+                    # 添加工具执行结果
+                    self.append_chat_history(
+                        {
+                            "role": "tool",
+                            "content": text_to_gpt,
+                            "tool_call_id": tool_id,
+                        }
+                    )
 
-                        # 添加工具执行结果
-                        self.append_chat_history(
-                            {
-                                "role": "tool",
-                                "content": text_to_gpt,
-                                "tool_call_id": tool_id,
-                            }
-                        )
-
-                        if error_occurred:
-                            retry_count += 1
-                            last_error_message = error_message
-                            reflection_prompt = f"""The code execution encountered an error:
+                    if error_occurred:
+                        retry_count += 1
+                        last_error_message = error_message
+                        reflection_prompt = f"""The code execution encountered an error:
 {error_message}
 
 Please analyze the error, identify the cause, and provide a corrected version of the code. 
@@ -280,21 +280,21 @@ Previous code:
 
 Please provide an explanation of what went wrong and the corrected code."""
 
-                            self.append_chat_history(
-                                {"role": "user", "content": reflection_prompt}
-                            )
-                            continue
+                        self.append_chat_history(
+                            {"role": "user", "content": reflection_prompt}
+                        )
+                        continue
 
-                        # 检查任务完成情况时也计入对话轮次
-                        self.current_chat_turns += 1
-                        # 使用π所有执行结果生成检查提示
-                        completion_check_prompt = f"""
+                    # 检查任务完成情况时也计入对话轮次
+                    self.current_chat_turns += 1
+                    # 使用π所有执行结果生成检查提示
+                    completion_check_prompt = f"""
 Please analyze the current state and determine if the task is fully completed:
 
 Original task: {prompt}
 
 Latest execution results:
-{combined_results}  # 修改：使用合并后的结果
+{text_to_gpt}  # 修改：使用合并后的结果
 
 Consider:
 1. Have all required data processing steps been completed?
@@ -318,13 +318,6 @@ If the task is complete, please provide a summary of what was accomplished about
                     )
 
                     # # TODO: 压缩对话历史
-                    # if completion_response.usage.prompt_tokens > self.max_tokens * 0.75:
-                    #     # 保留系统消息
-                    #     system_messages = [msg for msg in self.chat_history if msg["role"] == "system"]
-                    #     recent_messages = self.chat_history[-5:]
-                    #     self.chat_history = system_messages + recent_messages
-                    # elif completion_response.usage.prompt_tokens > self.max_tokens:
-                    #     raise Exception("token超出限制")
 
                     if not (
                         hasattr(completion_response.choices[0].message, "tool_calls")
@@ -333,18 +326,18 @@ If the task is complete, please provide a summary of what was accomplished about
                         task_completed = True
                         RichPrinter.agent_end(self.__class__.__name__)
                         return completion_response.choices[0].message.content
-                if retry_count >= self.max_retries:
-                    return f"Failed to complete task after {self.max_retries} attempts. Last error: {last_error_message}"
+            if retry_count >= self.max_retries:
+                return f"Failed to complete task after {self.max_retries} attempts. Last error: {last_error_message}"
 
-                if self.current_chat_turns >= self.max_chat_turns:
-                    return f"Reached maximum number of chat turns ({self.max_chat_turns}). Task incomplete."
+            if self.current_chat_turns >= self.max_chat_turns:
+                return f"Reached maximum number of chat turns ({self.max_chat_turns}). Task incomplete."
 
-            RichPrinter.agent_end(self.__class__.__name__)
-            return response.choices[0].message.content
-        except Exception as e:
-            error_msg = f"执行过程中遇到错误: {str(e)}"
-            log.error(f"Agent执行失败: {str(e)}")
-            return error_msg
+        RichPrinter.agent_end(self.__class__.__name__)
+        return response.choices[0].message.content
+        # except Exception as e:
+        #     error_msg = f"执行过程中遇到错误: {str(e)}"
+        #     log.error(f"Agent执行失败: {str(e)}")
+        #     return error_msg
 
     def get_notebook_serializer(self) -> NotebookSerializer:
         """获取notebook序列化器"""
