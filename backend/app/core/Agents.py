@@ -162,7 +162,7 @@ You should:
 15 在画图时候，matplotlib 需要正确显示中文，避免乱码问题。
 Note: If the user uploads a file, you will receive a system message "User uploaded a file: filename". Use the filename as the path in the code."""
 
-    def run(self, prompt: str, subtask_title: str) -> str:
+    async def run(self, prompt: str, subtask_title: str) -> str:
         RichPrinter.agent_start(self.__class__.__name__)
 
         self.notebook_serializer.add_markdown_segmentation_to_notebook(
@@ -236,18 +236,10 @@ Note: If the user uploads a file, you will receive a system message "User upload
                     # 执行工具调用
                     (
                         text_to_gpt,
-                        content_to_display,
+                        _,
                         error_occurred,
                         error_message,
-                    ) = self.code_interpreter.execute_code(code)
-                    print(
-                        "==========================="
-                        f"text_to_gpt: {text_to_gpt},"
-                        f"content_to_display: {content_to_display},"
-                        f"error_occurred: {error_occurred},"
-                        f"error_message: {error_message}"
-                        "==========================="
-                    )
+                    ) = await self.code_interpreter.execute_code(code)
 
                     # 记录执行结果
 

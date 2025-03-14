@@ -14,7 +14,7 @@ class MathModelAgent:
         self.problem = problem
         self.dirs = dirs
 
-    def start(self):
+    async def start(self):
         log.set_console_level("WARNING")
         log.init(self.dirs["log"])
         data_recorder = DataRecorder(self.dirs["log"])
@@ -45,6 +45,8 @@ class MathModelAgent:
             llm=deepseek_model,
         )
 
-        user_output: UserOutput = task.run(user_input, data_recorder=data_recorder)
+        user_output: UserOutput = await task.run(
+            user_input, data_recorder=data_recorder
+        )
 
         user_output.save_result(ques_count=user_input.get_ques_count())

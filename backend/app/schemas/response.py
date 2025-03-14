@@ -1,9 +1,10 @@
 from app.utils.enums import AgentType
 from pydantic import BaseModel
+from typing import Any
 
 
 class CodeExecutionResult(BaseModel):
-    content: dict[str, str]
+    content: list[tuple[str, Any]]
     error: str | None = None
 
 

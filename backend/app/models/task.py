@@ -11,7 +11,7 @@ class Task:
         self.dirs = dirs
         self.llm = llm
 
-    def run(self, user_input: UserInput, data_recorder) -> UserOutput:
+    async def run(self, user_input: UserInput, data_recorder) -> UserOutput:
         user_output = UserOutput(self.dirs, data_recorder=data_recorder)
 
         coder_agent = CoderAgent(
@@ -24,7 +24,7 @@ class Task:
         )
 
         solution_workflow = SolutionWorkFlow(coder_agent, user_input, user_output)
-        solution_workflow.execute()
+        await solution_workflow.execute()
 
         write_workflow = WriteWorkFlow(
             model=self.llm, user_input=user_input, user_output=user_output

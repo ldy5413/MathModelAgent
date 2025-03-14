@@ -1,11 +1,13 @@
 import os
 import re
+from typing import Any
 from e2b_code_interpreter import Sandbox
 from app.schemas.response import CodeExecutionResult, AgentMessage
 from app.utils.enums import AgentType
 from app.main import redis_async_client
 from app.utils.notebook_serializer import NotebookSerializer
 from app.utils.logger import log
+import asyncio
 
 
 def delete_color_control_char(string):
@@ -30,7 +32,13 @@ class E2BCodeInterpreter:
         #     },
         # }
         self.created_images: list[str] = []  # 当前求解创建的图片
-        self._pre_execute_code()
+
+        # 修改初始化方法，使其成为异步的
+        asyncio.create_task(self._initialize())
+
+    async def _initialize(self):
+        """异步初始化方法"""
+        await self._pre_execute_code()
         self._upload_all_files()
 
     def _upload_all_files(self):
@@ -49,12 +57,12 @@ class E2BCodeInterpreter:
         )
         await self.execute_code(init_code)
 
-    async def execute_code(self, code: str) -> tuple[str, list[str, str], bool, str]:
+    async def execute_code(self, code: str) -> tuple[str, list[str, Any], bool, str]:
         print("执行代码")
         self.notebook_serializer.add_code_cell_to_notebook(code)
 
         text_to_gpt: list[str] = []
-        content_to_display: list[tuple[str, str]] = []  # 发送给前端
+        content_to_display: list[tuple[str, Any]] = []  # 发送给前端
         error_occurred: bool = False
         error_message: str = ""
 
@@ -70,21 +78,21 @@ class E2BCodeInterpreter:
                 + execution.error.traceback
             )
             text_to_gpt.append(delete_color_control_char(error_message))
-            content_to_display.append(("error", error_message))
+            content_to_display.append(("error", str(error_message)))
 
         # 处理标准输出
         if execution.logs.stdout:
-            text_to_gpt.append(str(execution.logs.stdout))  # 确保转换为字符串
-            content_to_display.append(("text", execution.logs.stdout))
-            # self.notebook_serializer.add_code_cell_output_to_notebook(
-            # execution.logs.stdout
-            # )
+            stdout_str = str(execution.logs.stdout)  # 确保转换为字符串
+            text_to_gpt.append(stdout_str)
+            content_to_display.append(("text", stdout_str))
+            self.notebook_serializer.add_code_cell_output_to_notebook(stdout_str)
 
         # 处理执行结果
         for res in execution.results:
             # 处理文本结果
             if res.text:
                 text_to_gpt.append(str(res.text))  # 确保转换为字符串
+                content_to_display.append(("text", str(res.text)))
                 self.notebook_serializer.add_code_cell_output_to_notebook(res.text)
 
             # 处理图片结果

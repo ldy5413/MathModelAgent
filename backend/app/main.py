@@ -15,6 +15,7 @@ from app.utils.connection import manager
 from app.config.config import settings
 from app.utils.common_utils import create_task_id, create_work_directories
 from app.mathmodelagent import MathModelAgent
+from app.utils.enums import AgentType
 
 app = FastAPI()
 # origins = [
@@ -93,31 +94,86 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
     # 订阅指定频道
     await pubsub.subscribe(f"task:{task_id}:messages")
-    print(f"Subscribed to Redis channel: task:{task_id}:messages")  # 确认订阅频道
+    print(f"Subscribed to Redis channel: task:{task_id}:messages")
+
     try:
+        import asyncio
+
         while True:
-            msg = await pubsub.get_message(ignore_subscribe_messages=True)
-            if msg:
-                try:
-                    # 转换为AgentMessage确保格式正确
-                    agent_msg = AgentMessage.model_validate_json(msg["data"])
-                    await manager.send_personal_message_json(
-                        agent_msg.model_dump(), websocket
-                    )
-                except Exception as e:
-                    print(f"Error parsing message: {e}")
-                    await manager.send_personal_message(
-                        "Error parsing message", websocket
-                    )
-    except WebSocketDisconnect:
+            try:
+                # 创建两个并发任务：一个用于接收消息，一个用于发送心跳
+                async def receive_messages():
+                    while True:
+                        msg = await pubsub.get_message(ignore_subscribe_messages=True)
+                        if msg:
+                            try:
+                                agent_msg = AgentMessage.model_validate_json(
+                                    msg["data"]
+                                )
+                                await websocket.send_json(agent_msg.model_dump())
+                            except Exception as e:
+                                print(f"Error parsing message: {e}")
+                                await websocket.send_json({"error": str(e)})
+                        await asyncio.sleep(0.1)  # 短暂休眠避免CPU过载
+
+                async def send_heartbeat():
+                    while True:
+                        await websocket.send_json({"type": "heartbeat"})
+                        await asyncio.sleep(1)  # 每秒发送一次心跳
+
+                # 并发运行两个任务
+                await asyncio.gather(
+                    receive_messages(), send_heartbeat(), return_exceptions=True
+                )
+
+            except WebSocketDisconnect:
+                print("WebSocket disconnected")
+                break
+            except Exception as e:
+                print(f"Error in websocket loop: {e}")
+                # 不立即退出，尝试继续运行
+                await asyncio.sleep(1)
+                continue
+
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+    finally:
+        await pubsub.unsubscribe(f"task:{task_id}:messages")
         manager.disconnect(websocket)
+        print(f"WebSocket connection closed for task: {task_id}")
 
 
 async def run_modeling_task_async(problem: dict, dirs: dict):
     print("run_modeling_task_async")
-    # 将问题字典转换为Problem对象
-    problem = Problem(**problem)
-    mathmodel_agent = MathModelAgent(problem, dirs)
+    try:
+        problem = Problem(**problem)
+        mathmodel_agent = MathModelAgent(problem, dirs)
 
-    mathmodel_agent.start()
-    return {"task_id": problem.task_id, "result": "success"}
+        # 发送任务开始状态
+        await redis_async_client.publish(
+            f"task:{problem.task_id}:messages",
+            AgentMessage(
+                agent_type=AgentType.SYSTEM, content="任务开始处理"
+            ).model_dump_json(),
+        )
+
+        await mathmodel_agent.start()
+
+        # 发送任务完成状态
+        await redis_async_client.publish(
+            f"task:{problem.task_id}:messages",
+            AgentMessage(
+                agent_type=AgentType.SYSTEM, content="任务处理完成"
+            ).model_dump_json(),
+        )
+
+        return {"task_id": problem.task_id, "result": "success"}
+    except Exception as e:
+        # 发送错误状态
+        await redis_async_client.publish(
+            f"task:{problem.task_id}:messages",
+            AgentMessage(
+                agent_type=AgentType.SYSTEM, content=f"任务处理出错: {str(e)}"
+            ).model_dump_json(),
+        )
+        raise

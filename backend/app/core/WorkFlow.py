@@ -23,12 +23,12 @@ class SolutionWorkFlow(WorkFlow):
         super().__init__(user_input, user_output)
         self.coder_agent = coder_agent
 
-    def execute(self) -> dict:
+    async def execute(self) -> dict:
         RichPrinter.workflow_start()
         flows = self.user_input.get_solution_flows()
 
         for key, value in flows.items():
-            coder_response = self.coder_agent.run(
+            coder_response = await self.coder_agent.run(
                 value["coder_prompt"], subtask_title=key
             )
 
