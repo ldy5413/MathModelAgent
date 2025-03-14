@@ -50,6 +50,8 @@ class SolutionWorkFlow(WorkFlow):
                 ),
             )
             self.user_output.set_res(key, writer_response)
+        # 关闭沙盒
+        self.coder_agent.code_interpreter.shotdown_sandbox()
         log.info(self.user_output.get_res())
         RichPrinter.workflow_end()
         return self.user_output.get_res()

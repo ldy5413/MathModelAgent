@@ -18,7 +18,7 @@ class E2BCodeInterpreter:
         self, dirs: dict, task_id: str, notebook_serializer: NotebookSerializer
     ):
         self.dirs = dirs  # project / work_dir / task_id /
-        self.sbx = Sandbox()
+        self.sbx = Sandbox(timeout=60 * 20)
         self.task_id = task_id
         self.notebook_serializer = notebook_serializer
         # 保存coder_agent 在 jupyter 中执行的 output 结果内容
@@ -150,3 +150,15 @@ class E2BCodeInterpreter:
     def get_code_output(self, section: str) -> str:
         """获取指定section的代码输出"""
         return "\n".join(self.section_output[section]["content"])
+
+    def download_all_files_from_sandbox(self) -> dict:
+        """下载沙盒中的所有文件"""
+        log.info("下载沙盒中的所有文件")
+        for file in self.sbx.files.list("./"):
+            with open(os.path.join(self.dirs["jupyter"], file.name), "wb") as f:
+                f.write(file)
+
+    def shotdown_sandbox(self):
+        log.info("关闭沙盒")
+        self.download_all_files_from_sandbox()
+        self.sbx.kill()
