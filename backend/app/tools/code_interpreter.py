@@ -38,7 +38,7 @@ class E2BCodeInterpreter:
             with open(os.path.join(self.dirs["data"], file), "rb") as f:
                 self.sbx.files.write(file, f)
 
-    def _pre_execute_code(self):
+    async def _pre_execute_code(self):
         init_code = (
             "import matplotlib.pyplot as plt\n"
             # 更完整的中文字体配置
@@ -47,9 +47,9 @@ class E2BCodeInterpreter:
             "plt.rcParams['font.family'] = 'sans-serif'\n"
             # 设置DPI以获得更清晰的显示
         )
-        self.execute_code(init_code)
+        await self.execute_code(init_code)
 
-    def execute_code(self, code: str) -> tuple[str, list[str, str], bool, str]:
+    async def execute_code(self, code: str) -> tuple[str, list[str, str], bool, str]:
         print("执行代码")
         self.notebook_serializer.add_code_cell_to_notebook(code)
 
@@ -102,7 +102,7 @@ class E2BCodeInterpreter:
         for val in content_to_display:
             self.add_section(val[0])
             self.add_content(val[0], val[1])
-        self._push_to_websocket(content_to_display, error_message)
+        await self._push_to_websocket(content_to_display, error_message)
         return (
             "\n".join(text_to_gpt),
             content_to_display,
