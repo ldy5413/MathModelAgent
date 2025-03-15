@@ -53,28 +53,27 @@ async def config():
     }
 
 
-@app.post("/upload_files/")
-async def upload_files(files: list[UploadFile] = File(...)):
-    task_id = create_task_id()
-    base_dir, dirs = create_work_directories(task_id)
-    for file in files:
-        data_file_path = os.path.join(dirs["data"], file.filename)
-        with open(data_file_path, "wb") as f:
-            f.write(file.file.read())
-    redis_client.set(f"task_id:{task_id}", task_id)
-    return {"task_id": task_id, "message": "Files uploaded successfully"}
-
-
 @app.post("/modeling/")
-async def modeling(problem: Problem, background_tasks: BackgroundTasks):
-    task_id = problem.task_id
-    dirs = None
-    if task_id and redis_client.exists(f"task_id:{task_id}"):
-        # 存在任务，创建完整的目录结构
-        _, dirs = create_work_directories(task_id)
-    # else:
-    #     task_id = create_task_id()
-    #     files_path = None  # 不依赖数据集
+async def modeling(
+    problem: Problem,
+    background_tasks: BackgroundTasks,
+    files: list[UploadFile] = File(default=None),
+):
+    task_id = create_task_id()
+    _, dirs = create_work_directories(task_id)
+
+    # 如果有上传文件，保存文件
+    if files:
+        for file in files:
+            data_file_path = os.path.join(dirs["data"], file.filename)
+            with open(data_file_path, "wb") as f:
+                f.write(file.file.read())
+
+    # 存储任务ID
+    redis_client.set(f"task_id:{task_id}", task_id)
+
+    # 更新problem中的task_id
+    problem.task_id = task_id
 
     print(f"Adding background task for task_id: {task_id}")
     # 将任务添加到后台执行

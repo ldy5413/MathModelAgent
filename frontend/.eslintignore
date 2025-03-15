@@ -1,8 +1,0 @@
-# 忽略目录
-node_modules/
-dist/
-public/
-*.d.ts
-
-# 忽略单独文件
-*.config.js
