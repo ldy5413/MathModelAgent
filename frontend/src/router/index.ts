@@ -6,7 +6,7 @@ import { createRouter, createWebHashHistory } from "vue-router";
 const routes = [
 	{
 		path: "/",
-		redirect: "/chat",
+		redirect: "/session",
 	},
 	{
 		path: "/login",
@@ -15,6 +15,18 @@ const routes = [
 	{
 		path: "/chat",
 		component: () => import("@/pages/chat/index.vue"),
+	},
+	{
+		path: "/session",
+		component: () => import("@/pages/session/index.vue"),
+	},
+	{
+		path: "/test",
+		component: () => import("@/pages/test/index.vue"),
+	},
+	{
+		path: "/test-jupyter",
+		component: () => import("@/pages/test/testJupyter.vue"),
 	},
 ];
 
