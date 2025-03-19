@@ -1,20 +1,14 @@
 <script setup lang="ts">
 import Tree from '@/components/Tree.vue'
 import {
-  Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  type SidebarProps,
-  SidebarRail,
 } from '@/components/ui/sidebar'
 import { File } from 'lucide-vue-next'
-const props = defineProps<SidebarProps>()
+
 // This is sample data.
 const data = {
   changes: [
@@ -59,10 +53,10 @@ const data = {
   ],
 }
 </script>
-<template>
-  <Sidebar v-bind="props">
-    <SidebarContent>
 
+<template>
+  <div class="h-full">
+    <SidebarContent>
       <SidebarGroup>
         <SidebarGroupLabel>Files</SidebarGroupLabel>
         <SidebarGroupContent>
@@ -72,6 +66,5 @@ const data = {
         </SidebarGroupContent>
       </SidebarGroup>
     </SidebarContent>
-    <SidebarRail />
-  </Sidebar>
+  </div>
 </template>

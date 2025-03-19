@@ -38,28 +38,28 @@ import WriterEditor from '@/components/WriterEditor.vue'
     <ResizablePanel :default-size="75" class="h-screen">
       <div class="flex h-full flex-col">
         <Tabs default-value="coder" class="w-full h-full">
-          <div class="border-b px-4">
-            <TabsList class="justify-start">
-              <TabsTrigger value="coder" class="text-lg">
+          <div class="border-b px-4 py-1">
+            <TabsList class="justify-center">
+              <TabsTrigger value="coder" class="text-sm">
                 CoderAgent
               </TabsTrigger>
-              <TabsTrigger value="writer" class="text-lg">
+              <TabsTrigger value="writer" class="text-sm">
                 WriterAgent
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="coder" class="flex-1 p-6">
+          <TabsContent value="coder" class="flex-1 p-1">
             <Card>
-              <CardContent class="h-full p-0">
+              <CardContent class="p-2">
                 <CoderEditor />
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="writer" class="flex-1 p-6">
+          <TabsContent value="writer" class="flex-1 p-1">
             <Card>
-              <CardContent class="h-full p-0">
+              <CardContent class="p-2">
                 <WriterEditor />
               </CardContent>
             </Card>
