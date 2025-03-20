@@ -1,3 +1,5 @@
 api_key = "your-api-key-here"
 model = "deepseek-chat"
 base_url = "https://api.deepseek.com/v1"
+max_chat_turns = 60
+max_retries = 5
