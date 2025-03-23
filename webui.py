@@ -1,138 +1,135 @@
 import gradio as gr
-import os
-import threading
-import time
-from queue import Queue, Empty
-from utils.enums import CompTemplate, FormatOutPut
-from core.LLM import DeepSeekModel
-from utils.data_recorder import DataRecorder
-from utils.logger import log
-from utils.common_utils import create_work_directories, create_task_id, load_toml
 from config.config import Config
-from models.task import Task
+from utils.common_utils import create_work_directories, create_task_id, load_toml
+from utils.logger import log
+from utils.cli import get_ascii_banner
+from utils.data_recorder import DataRecorder
+from core.LLM import DeepSeekModel
 from models.user_input import UserInput
-
-# 全局变量
-message_queue = Queue()
-is_processing = False
-last_messages = {"CoderAgent": "", "WriterAgent": ""}
-current_status = ""
+from models.task import Task
+from models.user_output import UserOutput
+from gradio import ChatMessage
 
 
-def check_messages():
-    """检查队列消息，更新状态。"""
-    global current_status, last_messages
-
-    while not message_queue.empty():
-        msg = message_queue.get_nowait()
-        agent, content, status = msg.get("agent"), msg.get("content"), msg.get("status")
-
-        if status:
-            current_status = status
-        if content and agent in last_messages:
-            last_messages[agent] = content
-
-    return current_status, last_messages["CoderAgent"], last_messages["WriterAgent"]
+def bot(history: list, agent_name: str, message: str):
+    """用于流式输出消息到chatbot"""
+    # 创建新消息
+    new_message = ChatMessage(
+        role="assistant",
+        content=message,
+        metadata={"title": agent_name, "status": "done"},
+    )
+    history.append(new_message)
+    return history
 
 
-def process_input(
-    state,
-    comp_template,
-    format_output,
-    data_folder_path,
-    bg_text,
-    progress=gr.Progress(),
-):
-    """处理用户输入并执行任务。"""
-    global is_processing, current_status, last_messages
+def task_start(template, output_format, dataset_path, question, history):
+    print(get_ascii_banner())
+    # === 初始化 ===
+    history = []  # 重置历史记录
 
-    is_processing = True
-    current_status, last_messages = "初始化...", {"CoderAgent": "", "WriterAgent": ""}
-    progress(0.1, desc="初始化中...")
+    # 创建消息回调函数
+    def message_callback(agent_name, message):
+        nonlocal history
+        history = bot(history, agent_name, message)
+        return history
 
     try:
+        # 初始化日志和基本设置
         log.set_console_level("WARNING")
         task_id = create_task_id()
         base_dir, dirs = create_work_directories(task_id)
-        log.init(dirs["log"])
+        try:
+            log.init(dirs["log"])
+        except ValueError:
+            pass
+
+        # 添加初始状态消息
+        history = bot(history, "系统", f"开始任务，ID: {task_id}")
 
         config = Config(load_toml("config/config.toml"))
         data_recorder = DataRecorder(dirs["log"])
+
+        # 初始化模型
         deepseek_model = DeepSeekModel(
             **config.get_model_config(),
             data_recorder=data_recorder,
-            message_queue=message_queue,
+            message_callback=message_callback,
         )
 
+        # 创建用户输入
         user_input = UserInput(
-            comp_template=CompTemplate[comp_template],
-            format_output=FormatOutPut[format_output],
-            data_folder_path=data_folder_path,
-            bg_ques_all=bg_text,
+            comp_template=template,
+            format_output=output_format,
+            data_folder_path=dataset_path,
+            bg_ques_all=question,
             model=deepseek_model,
         )
+
         user_input.set_config_template(
             config.get_config_template(user_input.comp_template)
         )
 
-        task = Task(task_id, base_dir, dirs, deepseek_model, config)
-        user_output = task.run(user_input, data_recorder)
+        # 创建任务
+        task = Task(
+            task_id=task_id,
+            base_dir=base_dir,
+            work_dirs=dirs,
+            llm=deepseek_model,
+            config=config,
+        )
+
+        # 运行任务
+        user_output: UserOutput = task.run(user_input, data_recorder)
         user_output.save_result(ques_count=user_input.get_ques_count())
 
-        is_processing = False
-        return (
-            state,
-            f"✅ 任务完成！\n📌 任务ID: {task_id}\n📁 结果保存在: {base_dir}",
-            *check_messages(),
-        )
     except Exception as e:
-        is_processing = False
-        return state, f"❌ 发生错误: {str(e)}", *check_messages()
+        history = bot(history, "系统", f"错误: {str(e)}")
+
+    return history
 
 
-def periodic_update():
-    """定期刷新状态。"""
-    return check_messages()
-
-
-# Gradio 界面
-with gr.Blocks(title="数学建模助手", theme=gr.themes.Soft()) as demo:
-    state = gr.State({"is_processing": False})
-
-    gr.Markdown(
-        """# 🎓 数学建模助手\n请按照步骤操作：选择竞赛模板、输出格式、数据路径，并输入题目内容。"""
-    )
-
+# 创建 Blocks 界面
+with gr.Blocks() as demo:
     with gr.Row():
-        comp_template = gr.Dropdown(
-            choices=[t.name for t in CompTemplate],
-            value=CompTemplate.CHINA.name,
-            label="竞赛模板",
-        )
-        format_output = gr.Dropdown(
-            choices=[f.name for f in FormatOutPut],
-            value=FormatOutPut.Markdown.name,
-            label="输出格式",
-        )
-        data_folder = gr.Textbox(value="./project/sample_data", label="数据集路径")
+        # 左侧输入部分
+        with gr.Column(scale=1):
+            template = gr.Dropdown(
+                ["国赛", "美赛"],
+                label="模板",
+                info="选择你需要的模板(目前只支持中文)",
+                value="国赛",
+            )
+            output_format = gr.Dropdown(
+                ["Markdown", "Latex"],
+                label="输出格式",
+                info="选择你需要的输出格式(目前只支持markdown)",
+                value="Markdown",
+            )
+            dataset_path = gr.Textbox(
+                label="输入数据集的相对文件夹路径：(推荐将数据集放在./project/sample_data 目录下)",
+                value="./project/sample_data",
+            )
+            question = gr.Textbox(
+                label="输入题目",
+                value="",
+            )
+            submit_btn = gr.Button("提交")
 
-    bg_text = gr.Textbox(lines=10, label="题目内容", placeholder="粘贴完整题目内容...")
-    submit_btn = gr.Button("🚀 开始处理", variant="primary")
-    output = gr.Textbox(label="处理进度", lines=10)
-    agent_status, coder_output, writer_output = (
-        gr.Textbox(label="Agent 状态"),
-        gr.Markdown(label="Coder 输出"),
-        gr.Markdown(label="Writer 输出"),
-    )
+        # 右侧聊天部分
+        with gr.Column(scale=1):
+            chatbot = gr.Chatbot(
+                value=[],
+                label="任务进度",
+                type="messages",  # 指定使用 messages 类型
+                height=500,
+            )
 
     submit_btn.click(
-        process_input,
-        [state, comp_template, format_output, data_folder, bg_text],
-        [state, output, agent_status, coder_output, writer_output],
-    )
-    gr.Button("刷新").click(
-        periodic_update, [], [agent_status, coder_output, writer_output]
+        fn=task_start,
+        inputs=[template, output_format, dataset_path, question, chatbot],
+        outputs=chatbot,
+        queue=True,
     )
 
-if __name__ == "__main__":
-    demo.launch(server_name="127.0.0.1")
+demo.launch()

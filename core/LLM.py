@@ -12,7 +12,7 @@ class BaseModel:
         model: str,
         base_url: str,
         data_reacorder,
-        message_queue,
+        message_callback=None,
     ):
         self.api_key = api_key
         self.model = model
@@ -21,7 +21,7 @@ class BaseModel:
         self.chat_count = 0
         self.max_tokens: int | None = None  # 添加最大token数限制
         self.data_recorder = data_reacorder
-        self.message_queue = message_queue
+        self.message_callback = message_callback  # 添加回调函数
 
     def chat(
         self,
@@ -84,30 +84,15 @@ class BaseModel:
             if tool_call.function.name == "execute_code":
                 code = json.loads(tool_call.function.arguments)["code"]
 
-        if code == "":
-            self.send_message(
-                agent_name, completion.choices[0].message.content, "writing"
-            )
-        else:
-            self.send_message(
-                agent_name, completion.choices[0].message.content + code, "coding"
+        if self.message_callback:
+            self.message_callback(
+                agent_name, completion.choices[0].message.content + code
             )
 
         RichPrinter.print_agent_msg(
             completion.choices[0].message.content + code, agent_name=agent_name
         )
         log.debug(completion)
-
-    def send_message(self, agent_name, message, status=None):
-        if self.message_queue:
-            msg = {
-                "agent": agent_name,
-                "content": message,
-                "status": status,
-                "timestamp": time.time(),
-            }
-            print(f"发送消息: {msg}")  # 调试输出
-            self.message_queue.put(msg)
 
 
 class DeepSeekModel(BaseModel):
@@ -117,7 +102,13 @@ class DeepSeekModel(BaseModel):
         model: str,
         base_url: str,
         data_recorder,
-        message_queue,
+        message_callback=None,
     ):
-        super().__init__(api_key, model, base_url, data_recorder, message_queue)
+        super().__init__(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            data_reacorder=data_recorder,
+            message_callback=message_callback,
+        )
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
