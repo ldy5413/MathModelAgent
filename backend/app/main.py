@@ -5,6 +5,7 @@ from fastapi import (
     UploadFile,
     File,
     BackgroundTasks,
+    Form,
 )
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -55,8 +56,10 @@ async def config():
 
 @app.post("/modeling/")
 async def modeling(
-    problem_request: ProblemRequest,
     background_tasks: BackgroundTasks,
+    ques_all: str = Form(...),  # 从表单获取
+    comp_template: str = Form(...),  # 从表单获取
+    format_output: str = Form(...),  # 从表单获取
     files: list[UploadFile] = File(default=None),
 ):
     task_id = create_task_id()
@@ -72,12 +75,12 @@ async def modeling(
     # 存储任务ID
     redis_client.set(f"task_id:{task_id}", task_id)
 
-    # 将 ProblemRequest 转换为 Problem
+    # 创建 Problem 对象
     problem = Problem(
         task_id=task_id,
-        ques_all=problem_request.ques_all,
-        comp_template=problem_request.comp_template,
-        format_output=problem_request.format_output,
+        ques_all=ques_all,
+        comp_template=comp_template,
+        format_output=format_output,
     )
     print(problem)
     print(f"Adding background task for task_id: {task_id}")
