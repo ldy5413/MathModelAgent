@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 
 const currentStep = ref(1)
 const fileUploaded = ref(true)
-const question = ref('')
 
 const nextStep = () => {
   if (currentStep.value < 2)

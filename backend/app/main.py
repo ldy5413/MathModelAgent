@@ -9,7 +9,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from app.utils.redis_client import redis_client, redis_async_client
-from app.schemas.request import Problem
+from app.schemas.request import Problem, ProblemRequest
 from app.schemas.response import AgentMessage
 from app.utils.connection import manager
 from app.config.config import settings
@@ -55,7 +55,7 @@ async def config():
 
 @app.post("/modeling/")
 async def modeling(
-    problem: Problem,
+    problem_request: ProblemRequest,
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(default=None),
 ):
@@ -72,9 +72,14 @@ async def modeling(
     # 存储任务ID
     redis_client.set(f"task_id:{task_id}", task_id)
 
-    # 更新problem中的task_id
-    problem.task_id = task_id
-
+    # 将 ProblemRequest 转换为 Problem
+    problem = Problem(
+        task_id=task_id,
+        ques_all=problem_request.ques_all,
+        comp_template=problem_request.comp_template,
+        format_output=problem_request.format_output,
+    )
+    print(problem)
     print(f"Adding background task for task_id: {task_id}")
     # 将任务添加到后台执行
     background_tasks.add_task(run_modeling_task_async, problem.model_dump(), dirs)

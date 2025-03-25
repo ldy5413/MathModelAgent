@@ -6,7 +6,7 @@ import { createRouter, createWebHashHistory } from "vue-router";
 const routes = [
 	{
 		path: "/",
-		redirect: "/session",
+		redirect: "/chat",
 	},
 	{
 		path: "/login",
