@@ -89,19 +89,26 @@ async def modeling(
     return {"task_id": task_id, "status": "processing"}
 
 
-@app.websocket("/{task_id}")
+@app.websocket("/task/{task_id}")
 async def websocket_endpoint(websocket: WebSocket, task_id: str):
+    print(f"WebSocket 尝试连接 task_id: {task_id}")
     if not redis_client.exists(f"task_id:{task_id}"):
+        print(f"Task not found: {task_id}")  # 添加调试信息
         await websocket.close(code=1008, reason="Task not found")
         return
     print(f"WebSocket connected for task: {task_id}")
 
     await manager.connect(websocket)
+    print(
+        f"WebSocket connection status: {websocket.client}"
+    )  # 添加调试信息，显示客户端连接状态
+
     pubsub = redis_async_client.pubsub()
 
     # 订阅指定频道
     await pubsub.subscribe(f"task:{task_id}:messages")
     print(f"Subscribed to Redis channel: task:{task_id}:messages")
+    print(f"Redis pubsub status: {pubsub}")  # 添加调试信息，显示 Redis pubsub 状态
 
     try:
         import asyncio
@@ -113,11 +120,17 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
                     while True:
                         msg = await pubsub.get_message(ignore_subscribe_messages=True)
                         if msg:
+                            print(
+                                f"Received message: {msg}"
+                            )  # 添加调试信息，显示接收到的消息
                             try:
                                 agent_msg = AgentMessage.model_validate_json(
                                     msg["data"]
                                 )
                                 await websocket.send_json(agent_msg.model_dump())
+                                print(
+                                    f"Sent message to WebSocket: {agent_msg}"
+                                )  # 添加调试信息，显示发送的消息
                             except Exception as e:
                                 print(f"Error parsing message: {e}")
                                 await websocket.send_json({"error": str(e)})
@@ -126,7 +139,8 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
                 async def send_heartbeat():
                     while True:
                         await websocket.send_json({"type": "heartbeat"})
-                        await asyncio.sleep(1)  # 每秒发送一次心跳
+                        print("Sent heartbeat")  # 添加调试信息，显示心跳发送
+                        await asyncio.sleep(5)  # 每x秒发送一次心跳
 
                 # 并发运行两个任务
                 await asyncio.gather(
@@ -135,6 +149,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
             except WebSocketDisconnect:
                 print("WebSocket disconnected")
+
                 break
             except Exception as e:
                 print(f"Error in websocket loop: {e}")
@@ -152,6 +167,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
 async def run_modeling_task_async(problem: dict, dirs: dict):
     print("run_modeling_task_async")
+    # return÷
     try:
         problem = Problem(**problem)
         mathmodel_agent = MathModelAgent(problem, dirs)

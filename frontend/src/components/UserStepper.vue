@@ -13,6 +13,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { submitModelingTask } from '@/apis/submitModelingApi'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Rocket } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+
 const currentStep = ref(1)
 const fileUploaded = ref(true)
 
@@ -43,6 +47,14 @@ const selectConfig = [
   },
 ]
 
+// 添加状态控制
+const showUploadSuccess = ref(false)
+
+// 提交任务
+const showSubmitSuccess = ref(false)
+
+const taskId = ref<string | null>(null)
+
 const nextStep = () => {
   if (currentStep.value < 2)
     currentStep.value++
@@ -53,14 +65,20 @@ const prevStep = () => {
     currentStep.value--
 }
 
-// 处理文件上传
+// 修改文件上传处理
 const handleFileUpload = (event: Event) => {
   const input = event.target as HTMLInputElement
   if (input.files && input.files.length > 0) {
     uploadedFiles.value = Array.from(input.files)
     fileUploaded.value = true
+    showUploadSuccess.value = true // 显示提示
+    setTimeout(() => {
+      showUploadSuccess.value = false // 3秒后自动隐藏
+    }, 1000)
   }
 }
+
+const router = useRouter()
 
 const handleSubmit = async () => {
   try {
@@ -80,6 +98,13 @@ const handleSubmit = async () => {
       uploadedFiles.value
     )
 
+    taskId.value = response.data.task_id
+
+    showSubmitSuccess.value = true
+    setTimeout(() => {
+      showSubmitSuccess.value = false // 3秒后自动隐藏
+    }, 3000)
+    router.push(`/task/${taskId.value}`)
     console.log('任务提交成功:', response.data)
     // 这里可以添加跳转或状态更新逻辑
   } catch (error) {
@@ -90,7 +115,32 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="w-full max-w-xl mx-auto">
+  <div class="w-full max-w-xl mx-auto relative">
+    <!-- 使用 Alert 组件 -->
+    <Transition name="fade">
+      <div v-if="showUploadSuccess" class="fixed top-4 right-4 z-50">
+        <Alert>
+          <Rocket class="h-4 w-4" />
+          <AlertTitle>文件上传成功！</AlertTitle>
+          <AlertDescription>
+            已成功上传 {{ uploadedFiles.length }} 个文件，请继续下一步操作。
+          </AlertDescription>
+        </Alert>
+      </div>
+    </Transition>
+
+    <Transition name="fade">
+      <div v-if="showSubmitSuccess" class="fixed top-4 right-4 z-50">
+        <Alert>
+          <Rocket class="h-4 w-4" />
+          <AlertTitle>任务提交成功！</AlertTitle>
+          <AlertDescription>
+            任务提交成功，编号为：{{ taskId }}。
+          </AlertDescription>
+        </Alert>
+      </div>
+    </Transition>
+
     <div class="border rounded-lg shadow-sm">
       <!-- Step 1: File Upload -->
       <div v-if="currentStep === 1" class="p-6">

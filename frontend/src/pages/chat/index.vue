@@ -9,16 +9,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { getHelloWorld } from '@/apis/commonApi'
 onMounted(() => {
   getHelloWorld().then((res) => {
@@ -28,6 +18,7 @@ onMounted(() => {
 </script>
 
 <template>
+
   <SidebarProvider>
     <AppSidebar />
     <SidebarInset>

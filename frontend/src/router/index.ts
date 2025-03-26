@@ -17,8 +17,9 @@ const routes = [
 		component: () => import("@/pages/chat/index.vue"),
 	},
 	{
-		path: "/session",
-		component: () => import("@/pages/session/index.vue"),
+		path: "/task/:task_id",
+		component: () => import("@/pages/task/index.vue"),
+		props: true,
 	},
 	{
 		path: "/test",
