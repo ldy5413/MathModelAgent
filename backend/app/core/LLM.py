@@ -26,7 +26,7 @@ class LLM:
         self.data_recorder = data_reacorder
         self.task_id = task_id
 
-    def chat(
+    async def chat(
         self,
         history: list = None,
         tools: list = None,
@@ -57,7 +57,7 @@ class LLM:
                 if not completion or not hasattr(completion, "choices"):
                     raise ValueError("无效的API响应")
                 self.chat_count += 1
-                self.analyse_completion(completion, agent_name)
+                await self.analyse_completion(completion, agent_name)
                 return completion
             except json.JSONDecodeError:
                 log.error(f"第{attempt + 1}次重试: API返回无效JSON")
@@ -70,14 +70,14 @@ class LLM:
                 log.debug(f"请求参数: {kwargs}")
                 raise  # 如果所有重试都失败，则抛出异常
 
-    def analyse_completion(self, completion, agent_name: str):
+    async def analyse_completion(self, completion, agent_name: str):
         self.record_data(completion, agent_name)
-        self.print_msg(completion, agent_name)
+        await self.print_msg(completion, agent_name)
 
     def record_data(self, completion, agent_name: str):
         self.data_recorder.append_chat_completion(completion, agent_name)
 
-    def print_msg(self, completion, agent_name):
+    async def print_msg(self, completion, agent_name):
         code = ""
         if (
             hasattr(completion.choices[0].message, "tool_calls")
@@ -87,14 +87,14 @@ class LLM:
             if tool_call.function.name == "execute_code":
                 code = json.loads(tool_call.function.arguments)["code"]
 
-        self.send_message(agent_name, completion.choices[0].message.content, code)
+        await self.send_message(agent_name, completion.choices[0].message.content, code)
 
         RichPrinter.print_agent_msg(
             completion.choices[0].message.content + code, agent_name=agent_name
         )
         log.debug(completion)
 
-    def send_message(self, agent_name, content, code=None):
+    async def send_message(self, agent_name, content, code=None):
         agent_type = AgentType.CODER if agent_name == "CoderAgent" else AgentType.WRITER
         agent_msg = AgentMessage(
             agent_type=agent_type,
@@ -103,9 +103,9 @@ class LLM:
         )
         print(f"发送消息: {agent_msg.model_dump_json()}")  # 调试输出
 
-        self._push_to_websocket(agent_msg)
+        await self._push_to_websocket(agent_msg)
 
-    def _push_to_websocket(self, agent_msg: AgentMessage):
+    async def _push_to_websocket(self, agent_msg: AgentMessage):
         # 将同步方法改为异步方法
         async def _async_push():
             await redis_async_client.publish(
@@ -114,9 +114,8 @@ class LLM:
             )
 
         # 在同步上下文中运行异步任务
-        import asyncio
 
-        asyncio.create_task(_async_push())
+        await _async_push()
 
 
 class DeepSeekModel(LLM):

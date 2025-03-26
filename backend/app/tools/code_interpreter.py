@@ -33,7 +33,7 @@ class E2BCodeInterpreter:
         # }
         self.created_images: list[str] = []  # 当前求解创建的图片
 
-        # 修改初始化方法，使其成为异步的
+        # 在初始化时调用异步初始化方法
         asyncio.create_task(self._initialize())
 
     async def _initialize(self):

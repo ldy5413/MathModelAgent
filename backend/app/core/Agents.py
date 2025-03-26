@@ -46,7 +46,7 @@ class Agent:
         self.current_chat_turns = 0  # 当前对话轮次计数器
         self.user_output = user_output
 
-    def run(self, prompt: str, system_prompt: str) -> str:
+    async def run(self, prompt: str, system_prompt: str) -> str:
         """
         执行agent的对话并返回结果和总结
 
@@ -65,7 +65,7 @@ class Agent:
             self.append_chat_history({"role": "user", "content": prompt})
 
             # 获取历史消息用于本次对话
-            response = self.model.chat(
+            response = await self.model.chat(
                 history=self.chat_history, agent_name=self.__class__.__name__
             )
             response_content = response.choices[0].message.content
@@ -198,7 +198,7 @@ Note: If the user uploads a file, you will receive a system message "User upload
             and self.current_chat_turns < self.max_chat_turns
         ):
             self.current_chat_turns += 1
-            response = self.model.chat(
+            response = await self.model.chat(
                 history=self.chat_history,
                 tools=functions,
                 tool_choice="auto",
@@ -302,7 +302,7 @@ If the task is complete, please provide a summary of what was accomplished about
                         {"role": "user", "content": completion_check_prompt}
                     )
 
-                    completion_response = self.model.chat(
+                    completion_response = await self.model.chat(
                         history=self.chat_history,
                         tools=functions,
                         tool_choice="auto",
@@ -382,7 +382,7 @@ class WriterAgent(Agent):  # 同样继承自Agent类
 
         return super().run(prompt, self.system_prompt)
 
-    def summarize(self) -> str:
+    async def summarize(self) -> str:
         """
         总结对话内容
         """
@@ -391,7 +391,7 @@ class WriterAgent(Agent):  # 同样继承自Agent类
                 {"role": "user", "content": "请简单总结以上完成什么任务取得什么结果:"}
             )
             # 获取历史消息用于本次对话
-            response = self.model.chat(
+            response = await self.model.chat(
                 history=self.chat_history, agent_name=self.__class__.__name__
             )
             self.append_chat_history(
