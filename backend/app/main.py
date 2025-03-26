@@ -159,12 +159,29 @@ async def run_modeling_task_async(problem: dict, dirs: dict):
         )
 
         # 给一个短暂的延迟，确保 WebSocket 有机会连接
-        await asyncio.sleep(5)
+        await asyncio.sleep(1)
 
-        # 确保 start 方法是异步的
-        # await asyncio.create_task(mathmodel_agent.start())
-        # 修改这里：创建一个独立的任务来运行 start
-        task = asyncio.create_task(mathmodel_agent.start())
+        # 创建任务并等待它完成
+        try:
+            task = asyncio.create_task(mathmodel_agent.start())
+            # 设置超时时间（比如 30 分钟）
+            await asyncio.wait_for(task, timeout=1800)
+        except asyncio.TimeoutError:
+            print(f"Task {problem.task_id} timed out")
+            await redis_async_client.publish(
+                f"task:{problem.task_id}:messages",
+                AgentMessage(
+                    agent_type=AgentType.SYSTEM, content="任务执行超时"
+                ).model_dump_json(),
+            )
+        except Exception as e:
+            print(f"Error in task execution: {str(e)}")
+            await redis_async_client.publish(
+                f"task:{problem.task_id}:messages",
+                AgentMessage(
+                    agent_type=AgentType.SYSTEM, content=f"任务执行错误: {str(e)}"
+                ).model_dump_json(),
+            )
 
         # 发送任务完成状态
         await redis_async_client.publish(
@@ -176,6 +193,7 @@ async def run_modeling_task_async(problem: dict, dirs: dict):
 
         return {"task_id": problem.task_id, "result": "success"}
     except Exception as e:
+        print(f"Error in run_modeling_task_async: {str(e)}")
         # 发送错误状态
         await redis_async_client.publish(
             f"task:{problem.task_id}:messages",
