@@ -28,10 +28,14 @@ app = FastAPI()
 # 跨域 CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允许所有来源
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],  # 明确允许的前端地址
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # 暴露所有响应头
 )
 
 
@@ -99,6 +103,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
     print(f"WebSocket connected for task: {task_id}")
 
     await manager.connect(websocket)
+    websocket.timeout = 500
     print(f"WebSocket connection status: {websocket.client}")
 
     pubsub = redis_async_client.pubsub()

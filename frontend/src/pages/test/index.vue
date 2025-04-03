@@ -1,11 +1,8 @@
 <template>
-  <MdEditor v-model="text" class="border border-violet-500" />
+  <Tetris class="h-screen w-full [mask-image:radial-gradient(450px_circle_at_center,#8A2BE2,transparent)]" :base="30"
+    square-color="#8A2BE2" />
 </template>
 
-<script setup lang="ts">
-import { ref } from 'vue';
-import { MdEditor } from 'md-editor-v3';
-import 'md-editor-v3/lib/style.css';
-
-const text = ref('Hello Editor!');
+<script lang="ts" setup>
+import Tetris from '@/components/ui/tetris/Tetris.vue'
 </script>

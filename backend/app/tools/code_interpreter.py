@@ -39,12 +39,12 @@ class E2BCodeInterpreter:
     async def _initialize(self):
         """异步初始化方法"""
         await self._pre_execute_code()
-        self._upload_all_files()
+        await self._upload_all_files()
 
-    def _upload_all_files(self):
+    async def _upload_all_files(self):
         for file in os.listdir(self.dirs["data"]):
             with open(os.path.join(self.dirs["data"], file), "rb") as f:
-                self.sbx.files.write(file, f)
+                await self.sbx.files.write(file, f)
 
     async def _pre_execute_code(self):
         init_code = (
