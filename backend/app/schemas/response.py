@@ -10,7 +10,14 @@ class CodeExecutionResult(BaseModel):
 
 class AgentMessage(BaseModel):
     agent_type: AgentType
+    content: str | None = None
+
+
+class CoderMessage(AgentMessage):
+    agent_type: AgentType = AgentType.CODER
     code: str | None = None
     code_result: CodeExecutionResult | None = None
-    content: str | None = None
-    section: str | None = None
+
+
+class WriterMessage(AgentMessage):
+    agent_type: AgentType = AgentType.WRITER
