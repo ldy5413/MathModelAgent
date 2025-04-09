@@ -1,7 +1,6 @@
-from app.core.LLM import DeepSeekModel
+from app.core.llm import DeepSeekModel
 from app.utils.data_recorder import DataRecorder
-from app.utils.logger import log
-from app.config.config import settings
+from app.config.setting import settings
 from app.models.task import Task
 from app.models.user_output import UserOutput
 from app.models.user_input import UserInput
@@ -26,8 +25,6 @@ class MathModelAgent:
                 ).model_dump_json(),
             )
 
-            log.set_console_level("WARNING")
-            log.init(self.dirs["log"])
             data_recorder = DataRecorder(self.dirs["log"])
 
             # 加载配置文件

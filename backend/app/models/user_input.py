@@ -1,8 +1,7 @@
 from app.models.user_output import UserOutput
 from app.tools.code_interpreter import E2BCodeInterpreter
 from app.utils.enums import CompTemplate, FormatOutPut
-from app.core.LLM import LLM
-from app.utils.logger import log
+from app.core.llm import LLM
 from app.utils.common_utils import simple_chat
 import json
 import os
@@ -57,8 +56,6 @@ class UserInput:
         ]
         json_str = simple_chat(self.model, history)
         json_str = json_str.replace("```json", "").replace("```", "").strip()
-        log.info(f"json_str: {json_str}\n\n")
-        # 检查返回的 JSON 字符串是否有效
 
         if not json_str:
             raise ValueError("返回的 JSON 字符串为空，请检查输入内容。")

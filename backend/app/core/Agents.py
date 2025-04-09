@@ -1,14 +1,13 @@
 import json
-from app.core.LLM import LLM
+from app.core.llm import LLM
 from app.core.prompts import get_writer_prompt, CODER_PROMPT, MODELER_PROMPT
 from app.core.functions import tools
 from app.models.user_output import UserOutput
 from app.tools.code_interpreter import E2BCodeInterpreter
-from app.utils.common_utils import get_current_files
 from app.utils.enums import CompTemplate, FormatOutPut
-from app.utils.logger import log
+from app.utils.log_util import logger
 from app.utils.RichPrinter import RichPrinter
-from app.config.config import settings
+from app.config.setting import settings
 from app.utils.notebook_serializer import NotebookSerializer
 
 
@@ -54,7 +53,7 @@ class Agent:
             return response_content
         except Exception as e:
             error_msg = f"执行过程中遇到错误: {str(e)}"
-            log.error(f"Agent执行失败: {str(e)}")
+            logger.error(f"Agent执行失败: {str(e)}")
             return error_msg
 
     def append_chat_history(self, msg: dict) -> None:
@@ -317,6 +316,6 @@ class WriterAgent(Agent):  # 同样继承自Agent类
             )
             return response.choices[0].message.content
         except Exception as e:
-            log.error(f"总结生成失败: {str(e)}")
+            logger.error(f"总结生成失败: {str(e)}")
             # 返回一个基础总结，避免完全失败
             return "由于网络原因无法生成详细总结，但已完成主要任务处理。"

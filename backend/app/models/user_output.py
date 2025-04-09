@@ -1,5 +1,4 @@
 import os
-from app.utils.logger import log
 from app.utils.data_recorder import DataRecorder
 
 
@@ -32,7 +31,6 @@ class UserOutput:
 
     def print_summary(self):
         """打印统计摘要"""
-        log.info("Token Usage Summary:")
         pass
 
     def get_result_to_save(self, ques_count):
@@ -56,4 +54,3 @@ class UserOutput:
         res_path = os.path.join(self.work_dirs["res"], "res.md")
         with open(res_path, "w", encoding="utf-8") as f:
             f.write(self.get_result_to_save(ques_count))
-        log.info(f"结果已保存到 {res_path}")

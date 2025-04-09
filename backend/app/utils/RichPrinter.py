@@ -4,7 +4,7 @@ from rich.table import Table
 from rich.text import Text
 from typing import Optional, List, Any, Dict
 from rich import print as rprint
-from app.utils.logger import log
+from app.utils.log_util import logger
 
 
 class RichPrinter:
@@ -57,7 +57,7 @@ class RichPrinter:
 
     @staticmethod
     def print_agent_msg(message: str, agent_name: str):
-        log.info(f"{agent_name}: {message}")
+        logger.info(f"{agent_name}: {message}")
         if agent_name == "CoderAgent":
             rprint(
                 f"[bold purple on green]{agent_name}[/bold purple on green]: {message}"
@@ -120,7 +120,7 @@ class RichPrinter:
         formatted.append("🚀 ", style="bold")
         formatted.append("开始执行工作流", style="bold blue")
         cls._console.print(Panel.fit(formatted, border_style="blue", padding=(1, 4)))
-        log.info("\n=======================开始执行工作流=======================\n")
+        logger.info("\n=======================开始执行工作流=======================\n")
 
     @classmethod
     def workflow_end(cls):
@@ -130,7 +130,7 @@ class RichPrinter:
         formatted.append("✨ ", style="bold")
         formatted.append("工作流执行完成", style="bold green")
         cls._console.print(Panel.fit(formatted, border_style="green", padding=(1, 4)))
-        log.info("\n=======================工作流执行完成=======================\n")
+        logger.info("\n=======================工作流执行完成=======================\n")
 
     @classmethod
     def agent_start(cls, agent_name: str):
@@ -141,7 +141,7 @@ class RichPrinter:
         formatted.append(f"Agent: {agent_name} ", style="bold cyan")
         formatted.append("开始执行", style="bold blue")
         cls._console.print(Panel.fit(formatted, border_style="blue", padding=(1, 4)))
-        log.info(f"\n================Agent: {agent_name}开始=================\n")
+        logger.info(f"\n================Agent: {agent_name}开始=================\n")
 
     @classmethod
     def agent_end(cls, agent_name: str):
@@ -152,10 +152,4 @@ class RichPrinter:
         formatted.append(f"Agent: {agent_name} ", style="bold cyan")
         formatted.append("执行完成", style="bold green")
         cls._console.print(Panel.fit(formatted, border_style="green", padding=(1, 4)))
-        log.info(f"\n================Agent: {agent_name}结束==================\n")
-
-
-# 使用示例（无需实例化）
-# RichPrinter.success("文件保存成功！", title="操作完成")
-# RichPrinter.error("无法连接服务器", color="bright_red")
-# RichPrinter.table(headers=["ID", "Name"], rows=[[1, "Alice"], [2, "Bob"]])
+        logger.info(f"\n================Agent: {agent_name}结束==================\n")

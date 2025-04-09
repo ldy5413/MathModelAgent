@@ -2,7 +2,7 @@ import os
 import datetime
 import hashlib
 import tomllib
-from app.core.LLM import LLM
+from app.core.llm import LLM
 from app.utils.enums import CompTemplate
 
 

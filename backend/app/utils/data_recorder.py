@@ -1,6 +1,6 @@
 import json
 import os
-from app.utils.logger import log
+from app.utils.log_util import logger
 from typing import Any, Dict
 
 
@@ -25,7 +25,7 @@ class DataRecorder:
 
     def print_summary(self):
         """打印统计摘要"""
-        log.info("\n=== Token Usage and Cost Summary ===")
+        logger.info("\n=== Token Usage and Cost Summary ===")
 
         # 创建表格数据
         headers = ["Agent", "Chats", "Prompt", "Completion", "Total", "Cost ($)"]
@@ -81,7 +81,7 @@ class DataRecorder:
                 with open(json_path, "w", encoding="utf-8") as f:
                     json.dump(to_save, f, ensure_ascii=False, indent=4)
             except Exception as e:
-                log.error(f"写入json文件失败: {e}")
+                logger.error(f"写入json文件失败: {e}")
 
     def append_chat_history(self, msg: dict, agent_name: str) -> None:
         """添加聊天历史记录"""

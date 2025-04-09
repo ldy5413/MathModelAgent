@@ -1,7 +1,7 @@
 import jupyter_client
 import re
 import os
-from app.utils.logger import log
+from app.utils.log_util import log
 from app.utils.notebook_serializer import NotebookSerializer
 
 
@@ -138,10 +138,10 @@ class JupyterKernel:
             f"os.chdir(work_dir)\n"
             f"print('当前工作目录:', os.getcwd())\n"
             f"import matplotlib.pyplot as plt\n"
-# 更完整的中文字体配置
+            # 更完整的中文字体配置
             f"plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']\n"
             f"plt.rcParams['axes.unicode_minus'] = False\n"
-f"plt.rcParams['font.family'] = 'sans-serif'\n"
+            f"plt.rcParams['font.family'] = 'sans-serif'\n"
             # 设置DPI以获得更清晰的显示
         )
         self.execute_code_(init_code)

@@ -1,8 +1,8 @@
 from app.models.user_input import UserInput
 from app.models.user_output import UserOutput
-from app.core.Agents import CoderAgent
-from app.core.WorkFlow import SolutionWorkFlow, WriteWorkFlow
-from app.config.config import settings
+from app.core.agents import CoderAgent
+from app.core.workflow import SolutionWorkFlow, WriteWorkFlow
+from app.config.setting import settings
 
 
 class Task:

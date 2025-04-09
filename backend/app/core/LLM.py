@@ -1,7 +1,7 @@
 import json
 from openai import OpenAI
 from app.utils.RichPrinter import RichPrinter
-from app.utils.logger import log
+from app.utils.log_util import logger
 import time
 from app.schemas.response import AgentMessage
 from app.utils.enums import AgentType
@@ -60,14 +60,16 @@ class LLM:
                 await self.analyse_completion(completion, agent_name)
                 return completion
             except json.JSONDecodeError:
-                log.error(f"第{attempt + 1}次重试: API返回无效JSON")
+                logger.error(f"第{attempt + 1}次重试: API返回无效JSON")
                 time.sleep(retry_delay * (attempt + 1))
             except Exception as e:
-                log.error(f"API调用失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}")
+                logger.error(
+                    f"API调用失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}"
+                )
                 if attempt < max_retries - 1:  # 如果不是最后一次尝试
                     time.sleep(retry_delay * (attempt + 1))  # 指数退避
                     continue
-                log.debug(f"请求参数: {kwargs}")
+                logger.debug(f"请求参数: {kwargs}")
                 raise  # 如果所有重试都失败，则抛出异常
 
     async def analyse_completion(self, completion, agent_name: str):
@@ -92,7 +94,7 @@ class LLM:
         RichPrinter.print_agent_msg(
             completion.choices[0].message.content + code, agent_name=agent_name
         )
-        log.debug(completion)
+        logger.debug(completion)
 
     async def send_message(self, agent_name, content, code=None):
         agent_type = AgentType.CODER if agent_name == "CoderAgent" else AgentType.WRITER

@@ -1,6 +1,6 @@
-from app.core.Agents import WriterAgent, CoderAgent
-from app.core.LLM import LLM
-from app.utils.logger import log
+from app.core.agents import WriterAgent, CoderAgent
+from app.core.llm import LLM
+from app.utils.log_util import logger
 from app.models.user_input import UserInput
 from app.models.user_output import UserOutput
 from app.utils.RichPrinter import RichPrinter
@@ -52,7 +52,7 @@ class SolutionWorkFlow(WorkFlow):
             self.user_output.set_res(key, writer_response)
         # 关闭沙盒
         self.coder_agent.code_interpreter.shotdown_sandbox()
-        log.info(self.user_output.get_res())
+        logger.info(self.user_output.get_res())
         RichPrinter.workflow_end()
         return self.user_output.get_res()
 
@@ -76,6 +76,6 @@ class WriteWorkFlow(WorkFlow):
             )
             writer_response = writer_agent.run(value)
             self.user_output.set_res(key, writer_response)
-        log.info(self.user_output.get_res())
+        logger.info(self.user_output.get_res())
         RichPrinter.workflow_end()
         return self.user_output.get_res()

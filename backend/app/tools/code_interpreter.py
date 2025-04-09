@@ -4,9 +4,9 @@ from typing import Any
 from e2b_code_interpreter import Sandbox
 from app.schemas.response import CodeExecutionResult, AgentMessage
 from app.utils.enums import AgentType
-from app.main import redis_async_client
+from app.utils.redis_client import redis_async_client
 from app.utils.notebook_serializer import NotebookSerializer
-from app.utils.logger import log
+from app.utils.log_util import logger
 import asyncio
 
 
@@ -161,12 +161,12 @@ class E2BCodeInterpreter:
 
     def download_all_files_from_sandbox(self) -> dict:
         """下载沙盒中的所有文件"""
-        log.info("下载沙盒中的所有文件")
+        logger.info("下载沙盒中的所有文件")
         for file in self.sbx.files.list("./"):
             with open(os.path.join(self.dirs["jupyter"], file.name), "wb") as f:
                 f.write(file)
 
     def shotdown_sandbox(self):
-        log.info("关闭沙盒")
+        logger.info("关闭沙盒")
         self.download_all_files_from_sandbox()
         self.sbx.kill()
