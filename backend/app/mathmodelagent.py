@@ -7,7 +7,7 @@ from app.models.user_input import UserInput
 from app.schemas.request import Problem
 from app.utils.common_utils import get_config_template
 from app.schemas.response import AgentMessage, AgentType
-from app.utils.redis_client import redis_async_client
+from app.utils.redis_manager import redis_manager
 
 
 class MathModelAgent:
@@ -18,8 +18,8 @@ class MathModelAgent:
     async def start(self):
         try:
             # 在关键步骤发送状态更新
-            await redis_async_client.publish(
-                f"task:{self.problem.task_id}:messages",
+            await redis_manager.publish_message(
+                self.problem.task_id,
                 AgentMessage(
                     agent_type=AgentType.SYSTEM, content="开始执行建模任务"
                 ).model_dump_json(),

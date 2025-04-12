@@ -5,7 +5,7 @@ from app.utils.log_util import logger
 import time
 from app.schemas.response import AgentMessage
 from app.utils.enums import AgentType
-from app.utils.redis_client import redis_async_client
+from app.utils.redis_manager import redis_async_client
 
 
 class LLM:

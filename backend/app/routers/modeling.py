@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from app.config.setting import settings
-from app.utils.redis_client import redis_async_client
+from app.utils.redis_manager import redis_async_client
 from app.schemas.request import Problem
 from app.schemas.response import AgentMessage, AgentType
 from app.mathmodelagent import MathModelAgent

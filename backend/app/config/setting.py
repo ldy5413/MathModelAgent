@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str
     DEBUG: bool
     REDIS_URL: str
+    REDIS_MAX_CONNECTIONS: int
 
     model_config = SettingsConfigDict(env_file=".env.dev", env_file_encoding="utf-8")
 
