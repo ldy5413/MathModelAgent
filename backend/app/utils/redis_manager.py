@@ -18,6 +18,12 @@ class RedisManager:
             )
         return self._client
 
+    async def set(self, key: str, value: str):
+        """设置Redis键值对"""
+        client = await self.get_client()
+        await client.set(key, value)
+        await client.expire(key, 36000)
+
     async def publish_message(self, task_id: str, message: AgentMessage):
         """发布消息到特定任务的频道"""
         client = await self.get_client()

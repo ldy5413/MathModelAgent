@@ -1,7 +1,18 @@
-from pydantic import field_validator, Field
+from pydantic import AnyUrl, BeforeValidator, computed_field, field_validator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
-from typing import List
+from typing import Annotated
+
+
+def parse_cors(value: str) -> list[AnyUrl]:
+    """
+    Parses the CORS settings from a string to a list of URLs.
+    """
+    if value == "*":
+        return ["*"]
+    if "," in value:
+        return [url.strip() for url in value.split(",")]
+    return [value]
 
 
 class Settings(BaseSettings):
@@ -16,19 +27,9 @@ class Settings(BaseSettings):
     DEBUG: bool
     REDIS_URL: str
     REDIS_MAX_CONNECTIONS: int
+    CORS_ALLOW_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)]
 
     model_config = SettingsConfigDict(env_file=".env.dev", env_file_encoding="utf-8")
-
-    # @field_validator("CORS_ALLOW_ORIGINS", mode="before")
-    @classmethod
-    def validate_cors_allow_origins(cls, value: str | None) -> List[str]:
-        if not value:
-            return ["http://localhost:5173"]
-
-        if isinstance(value, str):
-            origins = [origin.strip() for origin in value.split(",") if origin.strip()]
-            return origins if origins else ["http://localhost:5173"]
-        return value if isinstance(value, list) else ["http://localhost:5173"]
 
     def get_deepseek_config(self) -> dict:
         return {

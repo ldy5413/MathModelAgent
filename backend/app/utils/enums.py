@@ -2,8 +2,8 @@ from enum import Enum
 
 
 class CompTemplate(str, Enum):
-    CHINA: str = "国赛"
-    AMERICAN: str = "美赛"
+    CHINA: str = "CHINA"
+    AMERICAN: str = "AMERICAN"
 
 
 class FormatOutPut(str, Enum):

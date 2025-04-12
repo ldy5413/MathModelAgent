@@ -13,3 +13,4 @@ project/work_dir/*
 .cursor/
 config/config.toml
 config/latex-template/
+logs/

@@ -4,6 +4,7 @@ import hashlib
 import tomllib
 from app.core.llm import LLM
 from app.utils.enums import CompTemplate
+from app.utils.log_util import logger
 
 
 def create_task_id() -> str:
@@ -14,37 +15,26 @@ def create_task_id() -> str:
     return f"{timestamp}-{random_hash}"
 
 
-def create_work_directories(task_id: str) -> tuple[str, dict]:
-    """
-    summary
-
-    Args:
-        task_id : description
-
-    Returns:
-        base_dir : './project/wirk_dir'
-        dirs : './project/work_dir/*'
-    """
-    work_dir_name = task_id
-
+def create_work_dir(task_id: str) -> str:
     # 设置主工作目录和子目录
-    base_dir = os.path.join("project", "work_dir", work_dir_name)
-    dirs = {
-        "data": os.path.join(base_dir, "data"),
-        "jupyter": os.path.join(base_dir, "jupyter"),
-        "log": os.path.join(base_dir, "log"),
-        "res": os.path.join(base_dir, "res"),
-    }
+    work_dir = os.path.join("project", "work_dir", task_id)
 
     # 检查目录是否已存在
-    if not os.path.exists(base_dir):
-        # 创建所需目录
-        for dir_path in dirs.values():
-            os.makedirs(dir_path, exist_ok=True)
+    if not os.path.exists(work_dir):
+        os.path.makedirs(work_dir)
     else:
-        print(f"目录已存在: {base_dir}")
+        print(f"目录已存在: {work_dir}")
 
-    return base_dir, dirs
+    return work_dir
+
+
+def get_work_dir(task_id: str) -> str:
+    work_dir = os.path.join("project", "work_dir", task_id)
+    if os.path.exists(work_dir):
+        return work_dir
+    else:
+        logger.error(f"工作目录不存在: {work_dir}")
+        raise FileNotFoundError(f"工作目录不存在: {work_dir}")
 
 
 def load_toml(path: str) -> dict:

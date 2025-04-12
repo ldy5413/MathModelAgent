@@ -3,8 +3,8 @@ from app.utils.data_recorder import DataRecorder
 
 
 class UserOutput:
-    def __init__(self, work_dirs: dict, data_recorder: DataRecorder):
-        self.work_dirs = work_dirs
+    def __init__(self, work_dir: str, data_recorder: DataRecorder):
+        self.work_dir = work_dir
         self.res: dict[str, str] = {
             # "eda": "",
             # "ques1": "",
@@ -51,6 +51,6 @@ class UserOutput:
         return "\n".join([self.res[key] for key in seq])
 
     def save_result(self, ques_count):
-        res_path = os.path.join(self.work_dirs["res"], "res.md")
+        res_path = os.path.join(self.work_dir, "res.md")
         with open(res_path, "w", encoding="utf-8") as f:
             f.write(self.get_result_to_save(ques_count))

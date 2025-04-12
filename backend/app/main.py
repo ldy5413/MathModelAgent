@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from app.routers import modeling, ws
 from app.utils.log_util import logger
+from app.config.setting import settings
 
 
 @asynccontextmanager
@@ -31,7 +32,7 @@ app.include_router(ws.router)
 # 跨域 CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

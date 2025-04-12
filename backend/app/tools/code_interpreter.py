@@ -4,7 +4,7 @@ from typing import Any
 from e2b_code_interpreter import Sandbox
 from app.schemas.response import CodeExecutionResult, AgentMessage
 from app.utils.enums import AgentType
-from app.utils.redis_client import redis_async_client
+from app.utils.redis_manager import redis_async_client
 from app.utils.notebook_serializer import NotebookSerializer
 from app.utils.log_util import logger
 import asyncio

@@ -3,17 +3,18 @@ import unittest
 from dotenv import load_dotenv
 
 from app.tools.code_interpreter import E2BCodeInterpreter
-from app.utils.common_utils import create_task_id, create_work_directories
+from app.utils.common_utils import create_task_id, create_work_dir
 from app.utils.notebook_serializer import NotebookSerializer
 
 
 class TestE2BCodeInterpreter(unittest.TestCase):
-
     def setUp(self):
         load_dotenv()
-        _,dirs =  create_work_directories("20250312-104132-d3625cab")
-        notebook =  NotebookSerializer(dirs['jupyter'])
-        self.code_interpreter = E2BCodeInterpreter(dirs, "20250312-104132-d3625cab", notebook)
+        _, dirs = create_work_dir("20250312-104132-d3625cab")
+        notebook = NotebookSerializer(dirs["jupyter"])
+        self.code_interpreter = E2BCodeInterpreter(
+            dirs, "20250312-104132-d3625cab", notebook
+        )
 
     def test_execute_code(self):
         code = """

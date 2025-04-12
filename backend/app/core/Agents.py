@@ -1,7 +1,14 @@
 import json
 from app.core.llm import LLM
-from app.core.prompts import get_writer_prompt, CODER_PROMPT, MODELER_PROMPT
+from app.core.prompts import (
+    get_completion_check_prompt,
+    get_reflection_prompt,
+    get_writer_prompt,
+    CODER_PROMPT,
+    MODELER_PROMPT,
+)
 from app.core.functions import tools
+from app.models.model import CoderToWriter
 from app.models.user_output import UserOutput
 from app.tools.code_interpreter import E2BCodeInterpreter
 from app.utils.enums import CompTemplate, FormatOutPut
@@ -79,12 +86,11 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         self,
         model: LLM,
         dirs: dict,  # 工作目录
-        max_chat_turns: int = settings.MAX_CHAT_TURNS,  # TODO: 配置文件
-        max_retries: int = settings.MAX_RETRIES,  # 重试次数
-        user_output: UserOutput = None,
+        max_chat_turns: int = settings.MAX_CHAT_TURNS,  # 最大聊天次数
+        max_retries: int = settings.MAX_RETRIES,  # 最大反思次数
         task_id: str = None,
     ) -> None:
-        super().__init__(model, max_chat_turns, user_output)
+        super().__init__(model, max_chat_turns)
         self.dirs = dirs
         self.notebook_serializer = NotebookSerializer(dirs["jupyter"])
         self.code_interpreter = E2BCodeInterpreter(
@@ -95,12 +101,8 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         self.is_first_run = True
         self.system_prompt = CODER_PROMPT
 
-    async def run(self, prompt: str, subtask_title: str) -> str:
-        RichPrinter.agent_start(self.__class__.__name__)
-
-        self.notebook_serializer.add_markdown_segmentation_to_notebook(
-            content=prompt, segmentation=subtask_title
-        )
+    async def run(self, prompt: str, subtask_title: str) -> CoderToWriter:
+        logger.info(f"{self.__class__.__name__}:开始:执行子任务: {subtask_title}")
         self.code_interpreter.add_section(subtask_title)
 
         # 如果是第一次运行，则添加系统提示
@@ -188,22 +190,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                     if error_occurred:
                         retry_count += 1
                         last_error_message = error_message
-                        reflection_prompt = f"""The code execution encountered an error:
-{error_message}
-
-Please analyze the error, identify the cause, and provide a corrected version of the code. 
-Consider:
-1. Syntax errors
-2. Missing imports
-3. Incorrect variable names or types
-4. File path issues
-5. Any other potential issues
-6. 如果一个任务反复无法完成，尝试切换路径、简化路径，千万别陷入反复重试，导致死循环。
-
-Previous code:
-{code}
-
-Please provide an explanation of what went wrong and the corrected code."""
+                        reflection_prompt = get_reflection_prompt()
 
                         self.append_chat_history(
                             {"role": "user", "content": reflection_prompt}
@@ -213,24 +200,9 @@ Please provide an explanation of what went wrong and the corrected code."""
                     # 检查任务完成情况时也计入对话轮次
                     self.current_chat_turns += 1
                     # 使用π所有执行结果生成检查提示
-                    completion_check_prompt = f"""
-Please analyze the current state and determine if the task is fully completed:
-
-Original task: {prompt}
-
-Latest execution results:
-{text_to_gpt}  # 修改：使用合并后的结果
-
-Consider:
-1. Have all required data processing steps been completed?
-2. Have all necessary files been saved?
-3. Are there any remaining steps needed?
-4. Is the output satisfactory and complete?
-5. 如果一个任务反复无法完成，尝试切换路径、简化路径或直接跳过，千万别陷入反复重试，导致死循环。
-6. 尽量在较少的对话轮次内完成任务，task_completed = True
-If the task is not complete, please explain what remains to be done and continue with the next steps.
-If the task is complete, please provide a summary of what was accomplished about your create image name.
-"""
+                    completion_check_prompt = get_completion_check_prompt(
+                        prompt, text_to_gpt
+                    )
                     self.append_chat_history(
                         {"role": "user", "content": completion_check_prompt}
                     )
@@ -251,18 +223,16 @@ If the task is complete, please provide a summary of what was accomplished about
                         task_completed = True
                         RichPrinter.agent_end(self.__class__.__name__)
                         return completion_response.choices[0].message.content
+
             if retry_count >= self.max_retries:
                 return f"Failed to complete task after {self.max_retries} attempts. Last error: {last_error_message}"
 
             if self.current_chat_turns >= self.max_chat_turns:
                 return f"Reached maximum number of chat turns ({self.max_chat_turns}). Task incomplete."
 
-        RichPrinter.agent_end(self.__class__.__name__)
-        return response.choices[0].message.content
+        logger.info(f"{self.__class__.__name__}:完成:执行子任务: {subtask_title}")
 
-    def get_notebook_serializer(self) -> NotebookSerializer:
-        """获取notebook序列化器"""
-        return self.notebook_serializer
+        return response.choices[0].message.content
 
 
 # 长文本

@@ -14,7 +14,6 @@ class LLM:
         api_key: str,
         model: str,
         base_url: str,
-        data_reacorder,
         task_id: str,
     ):
         self.api_key = api_key
@@ -23,7 +22,6 @@ class LLM:
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.chat_count = 0
         self.max_tokens: int | None = None  # 添加最大token数限制
-        self.data_recorder = data_reacorder
         self.task_id = task_id
 
     async def chat(
@@ -73,11 +71,7 @@ class LLM:
                 raise  # 如果所有重试都失败，则抛出异常
 
     async def analyse_completion(self, completion, agent_name: str):
-        self.record_data(completion, agent_name)
         await self.print_msg(completion, agent_name)
-
-    def record_data(self, completion, agent_name: str):
-        self.data_recorder.append_chat_completion(completion, agent_name)
 
     async def print_msg(self, completion, agent_name):
         code = ""
@@ -127,7 +121,6 @@ class DeepSeekModel(LLM):
         model: str,
         base_url: str,
         task_id: str,
-        data_recorder,
     ):
-        super().__init__(api_key, model, base_url, data_recorder, task_id)
+        super().__init__(api_key, model, base_url, task_id)
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
