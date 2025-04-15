@@ -69,7 +69,7 @@ uv sync # 安装依赖
 ```bash
 uv run example.py # 简单测试能否正确运行
 uv run webui.py # 推荐: 启动 webui
-uv run termial.py # 启动终端项目
+uv run terminal.py # 启动终端项目
 ```
 
 运行的结果在`/project/work_dir/`目录下
