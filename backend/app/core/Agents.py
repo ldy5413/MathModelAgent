@@ -10,12 +10,10 @@ from app.core.prompts import (
 from app.core.functions import tools
 from app.models.model import CoderToWriter
 from app.models.user_output import UserOutput
-from app.tools.code_interpreter import E2BCodeInterpreter
 from app.utils.enums import CompTemplate, FormatOutPut
 from app.utils.log_util import logger
 from app.utils.RichPrinter import RichPrinter
 from app.config.setting import settings
-from app.utils.notebook_serializer import NotebookSerializer
 
 
 class Agent:
@@ -85,18 +83,12 @@ class CoderAgent(Agent):  # 同样继承自Agent类
     def __init__(
         self,
         model: LLM,
-        dirs: dict,  # 工作目录
+        work_dir: str,  # 工作目录
         max_chat_turns: int = settings.MAX_CHAT_TURNS,  # 最大聊天次数
         max_retries: int = settings.MAX_RETRIES,  # 最大反思次数
-        task_id: str = None,
     ) -> None:
         super().__init__(model, max_chat_turns)
-        self.dirs = dirs
-        self.notebook_serializer = NotebookSerializer(dirs["jupyter"])
-        self.code_interpreter = E2BCodeInterpreter(
-            dirs, task_id, self.notebook_serializer
-        )
-
+        self.work_dir = work_dir
         self.max_retries = max_retries
         self.is_first_run = True
         self.system_prompt = CODER_PROMPT

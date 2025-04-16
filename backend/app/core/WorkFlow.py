@@ -1,3 +1,4 @@
+import e2b_code_interpreter
 from openai import base_url
 from app.core.agents import WriterAgent, CoderAgent
 from app.core.llm import LLM
@@ -10,6 +11,7 @@ from app.utils.RichPrinter import RichPrinter
 from app.models.user_output import UserOutput
 from app.config.setting import settings
 from app.core.llm import DeepSeekModel
+from app.tools.code_interpreter import E2BCodeInterpreter
 import json
 
 class WorkFlow:
@@ -42,12 +44,13 @@ class MathModelWorkFlow(WorkFlow):
 
         user_output = UserOutput()
 
+        e2b_code_interpreter  = E2BCodeInterpreter()
+
         coder_agent = CoderAgent(
             model=deepseek_model,
-            self.dirs,
+            work_dir=self.work_dir,
             max_chat_turns=settings.MAX_CHAT_TURNS,
             max_retries=settings.MAX_RETRIES,
-            user_output=user_output,
             task_id=self.task_id,
         )
 
@@ -62,15 +65,15 @@ class MathModelWorkFlow(WorkFlow):
 
             # TODO: 是否可以不需要coder_response
             writer_prompt = self.get_writer_prompt(
-                key, coder_response, self.coder_agent.code_interpreter
+                key, coder_response, e2b_code_interpreter
             )
             # TODO: 自定义 writer_agent mode llm
             writer_agent = WriterAgent(
-                model=self.coder_agent.model,
-                comp_template=self.user_input.get_comp_template(),
-                format_output=self.user_input.get_format_output(),
-                user_output=self.user_output,
+                model=deepseek_model,
+                comp_template=problem.comp_template,
+                format_output=problem.format_output,
             )
+
             writer_response = writer_agent.run(
                 writer_prompt,
                 available_images=self.coder_agent.code_interpreter.get_created_images(
