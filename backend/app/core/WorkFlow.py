@@ -43,7 +43,7 @@ class MathModelWorkFlow(WorkFlow):
         user_output = UserOutput(work_dir=self.work_dir)
 
         notebook_serializer = NotebookSerializer(work_dir=self.work_dir)
-        e2b_code_interpreter = E2BCodeInterpreter(
+        e2b_code_interpreter = await E2BCodeInterpreter.create(
             workd_dir=self.work_dir,
             task_id=self.task_id,
             notebook_serializer=notebook_serializer,
@@ -80,12 +80,12 @@ class MathModelWorkFlow(WorkFlow):
 
             writer_response = writer_agent.run(
                 writer_prompt,
-                available_images=e2b_code_interpreter.get_created_images(key),
+                available_images=await e2b_code_interpreter.get_created_images(key),
             )
             user_output.set_res(key, writer_response)
         # 关闭沙盒
 
-        e2b_code_interpreter.shotdown_sandbox()
+        await e2b_code_interpreter.shutdown_sandbox()
         logger.info(user_output.get_res())
 
         ################################################ write steps
@@ -224,13 +224,13 @@ class MathModelWorkFlow(WorkFlow):
     ):
         model_build_solve = user_output.get_model_build_solve()
         flows = {
-            "firstPage": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{self.config_template["firstPage"]}，撰写标题，摘要，关键词""",
-            "RepeatQues": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{self.config_template["RepeatQues"]}，撰写问题重述""",
-            "analysisQues": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{self.config_template["analysisQues"]}，撰写问题分析""",
-            "modelAssumption": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{self.config_template["modelAssumption"]}，撰写模型假设""",
-            "symbol": f"""不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{self.config_template["symbol"]}，撰写符号说明部分""",
-            "judge": f"""不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{self.config_template["judge"]}，撰写模型的评价部分""",
+            "firstPage": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{config_template["firstPage"]}，撰写标题，摘要，关键词""",
+            "RepeatQues": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{config_template["RepeatQues"]}，撰写问题重述""",
+            "analysisQues": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{config_template["analysisQues"]}，撰写问题分析""",
+            "modelAssumption": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{config_template["modelAssumption"]}，撰写模型假设""",
+            "symbol": f"""不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{config_template["symbol"]}，撰写符号说明部分""",
+            "judge": f"""不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{config_template["judge"]}，撰写模型的评价部分""",
             # TODO: 修改参考文献插入方式
-            "reference": f"""不需要编写代码,根据模型的求解的信息{model_build_solve}，可以生成参考文献,按照如下模板撰写：{self.config_template["reference"]}，撰写参考文献""",
+            "reference": f"""不需要编写代码,根据模型的求解的信息{model_build_solve}，可以生成参考文献,按照如下模板撰写：{config_template["reference"]}，撰写参考文献""",
         }
         return flows
