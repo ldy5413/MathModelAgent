@@ -2,15 +2,14 @@ from app.core.agents import WriterAgent, CoderAgent
 from app.core.llm import LLM
 from app.schemas.request import Problem
 from app.utils.log_util import logger
-from app.utils.common_utils import create_work_dir, simple_chat
-from app.utils.enums import CompTemplate, FormatOutPut
-from app.models.user_input import UserInput
-from app.utils.RichPrinter import RichPrinter
+from app.utils.common_utils import create_work_dir, simple_chat, get_config_template
 from app.models.user_output import UserOutput
 from app.config.setting import settings
 from app.core.llm import DeepSeekModel
 from app.tools.code_interpreter import E2BCodeInterpreter
 import json
+
+from app.utils.notebook_serializer import NotebookSerializer
 
 
 class WorkFlow:
@@ -18,8 +17,9 @@ class WorkFlow:
         pass
 
     def execute(self) -> str:
-        RichPrinter.workflow_start()
-        RichPrinter.workflow_end()
+        # RichPrinter.workflow_start()
+        # RichPrinter.workflow_end()
+        pass
 
 
 class MathModelWorkFlow(WorkFlow):
@@ -40,10 +40,13 @@ class MathModelWorkFlow(WorkFlow):
             task_id=self.task_id,
         )
 
-        user_output = UserOutput()
+        user_output = UserOutput(work_dir=self.work_dir)
 
+        notebook_serializer = NotebookSerializer(work_dir=self.work_dir)
         e2b_code_interpreter = E2BCodeInterpreter(
-            workd_dir=self.work_dir, task_id=self.task_id
+            workd_dir=self.work_dir,
+            task_id=self.task_id,
+            notebook_serializer=notebook_serializer,
         )
 
         coder_agent = CoderAgent(
@@ -51,12 +54,13 @@ class MathModelWorkFlow(WorkFlow):
             work_dir=self.work_dir,
             max_chat_turns=settings.MAX_CHAT_TURNS,
             max_retries=settings.MAX_RETRIES,
-            task_id=self.task_id,
             code_interpreter=e2b_code_interpreter,
         )
 
         ################################################ solution steps
         solution_steps = self.get_solution_steps()
+
+        config_template = get_config_template(problem.comp_template)
 
         for key, value in solution_steps.items():
             coder_response = await coder_agent.run(
@@ -65,7 +69,7 @@ class MathModelWorkFlow(WorkFlow):
 
             # TODO: 是否可以不需要coder_response
             writer_prompt = self.get_writer_prompt(
-                key, coder_response, e2b_code_interpreter
+                key, coder_response, e2b_code_interpreter, config_template
             )
             # TODO: 自定义 writer_agent mode llm
             writer_agent = WriterAgent(
@@ -80,12 +84,13 @@ class MathModelWorkFlow(WorkFlow):
             )
             user_output.set_res(key, writer_response)
         # 关闭沙盒
+
         e2b_code_interpreter.shotdown_sandbox()
         logger.info(user_output.get_res())
 
         ################################################ write steps
 
-        flows = self.get_write_flows(user_output)
+        flows = self.get_write_flows(user_output, config_template, problem.ques_all)
         for key, value in flows.items():
             # TODO: writer_agent 是否不需要初始化
             writer_agent = WriterAgent(
@@ -155,7 +160,11 @@ class MathModelWorkFlow(WorkFlow):
         return flows
 
     def get_writer_prompt(
-        self, key: str, coder_response: str, code_interpreter: E2BCodeInterpreter
+        self,
+        key: str,
+        coder_response: str,
+        code_interpreter: E2BCodeInterpreter,
+        config_template: dict,
     ) -> str:
         """根据不同的key生成对应的writer_prompt
 
@@ -176,18 +185,18 @@ class MathModelWorkFlow(WorkFlow):
         bgc = self.get_questions()["background"]
         quesx_writer_prompt = {
             key: f"""
-                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{self.config_template[key]}
+                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{config_template[key]}
                 """
             for key in questions_quesx_keys
         }
 
         writer_prompt = {
             "eda": f"""
-                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{self.config_template["eda"]}
+                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{config_template["eda"]}
                 """,
             **quesx_writer_prompt,
             "sensitivity_analysis": f"""
-                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{self.config_template["sensitivity_analysis"]}
+                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{config_template["sensitivity_analysis"]}
                 """,
         }
 
@@ -196,9 +205,24 @@ class MathModelWorkFlow(WorkFlow):
         else:
             raise ValueError(f"未知的任务类型: {key}")
 
-    def get_write_flows(self, user_output: UserOutput):
+    def get_questions_quesx_keys(self) -> list[str]:
+        """获取问题1,2...的键"""
+        return list(self.get_questions_quesx().keys())
+
+    def get_questions_quesx(self) -> dict[str, str]:
+        """获取问题1,2,3...的键值对"""
+        # 获取所有以 "ques" 开头的键值对
+        questions_quesx = {
+            key: value
+            for key, value in self.questions.items()
+            if key.startswith("ques") and key != "ques_count"
+        }
+        return questions_quesx
+
+    def get_write_flows(
+        self, user_output: UserOutput, config_template: dict, bg_ques_all: str
+    ):
         model_build_solve = user_output.get_model_build_solve()
-        bg_ques_all = self.get_bg_ques_all()
         flows = {
             "firstPage": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{self.config_template["firstPage"]}，撰写标题，摘要，关键词""",
             "RepeatQues": f"""问题背景{bg_ques_all},不需要编写代码,根据模型的求解的信息{model_build_solve}，按照如下模板撰写：{self.config_template["RepeatQues"]}，撰写问题重述""",

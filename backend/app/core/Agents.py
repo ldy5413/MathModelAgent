@@ -1,5 +1,4 @@
 import json
-from math import log
 from app.core.llm import LLM
 from app.core.prompts import (
     get_completion_check_prompt,
@@ -64,9 +63,9 @@ class Agent:
 
     def append_chat_history(self, msg: dict) -> None:
         self.chat_history.append(msg)
-        self.user_output.data_recorder.append_chat_history(
-            msg, agent_name=self.__class__.__name__
-        )
+        # self.user_output.data_recorder.append_chat_history(
+        # msg, agent_name=self.__class__.__name__
+        # )
 
 
 class ModelerAgent(Agent):  # 继承自Agent类而不是BaseModel

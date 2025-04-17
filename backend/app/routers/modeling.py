@@ -9,6 +9,7 @@ from app.schemas.response import AgentMessage, AgentType
 from app.utils.common_utils import create_task_id, create_work_dir
 import os
 import asyncio
+from fastapi import HTTPException
 
 router = APIRouter()
 
@@ -43,13 +44,36 @@ async def modeling(
 
     # 如果有上传文件，保存文件
     if files:
+        logger.info(f"开始处理上传的文件，工作目录: {work_dir}")
         for file in files:
-            data_file_path = os.path.join(work_dir, file.filename)
-            with open(data_file_path, "wb") as f:
-                f.write(file.file.read())
+            try:
+                data_file_path = os.path.join(work_dir, file.filename)
+                logger.info(f"保存文件: {file.filename} -> {data_file_path}")
+
+                # 确保文件名不为空
+                if not file.filename:
+                    logger.warning("跳过空文件名")
+                    continue
+
+                content = await file.read()
+                if not content:
+                    logger.warning(f"文件 {file.filename} 内容为空")
+                    continue
+
+                with open(data_file_path, "wb") as f:
+                    f.write(content)
+                logger.info(f"成功保存文件: {data_file_path}")
+
+            except Exception as e:
+                logger.error(f"保存文件 {file.filename} 失败: {str(e)}")
+                raise HTTPException(
+                    status_code=500, detail=f"保存文件 {file.filename} 失败: {str(e)}"
+                )
+    else:
+        logger.warning("没有上传文件")
 
     # 存储任务ID
-    redis_manager.set(f"task_id:{task_id}", task_id)
+    await redis_manager.set(f"task_id:{task_id}", task_id)
 
     logger.info(f"Adding background task for task_id: {task_id}")
     # 将任务添加到后台执行
@@ -77,9 +101,7 @@ async def run_modeling_task_async(
     # 发送任务开始状态
     await redis_manager.publish_message(
         f"task:{problem.task_id}:messages",
-        AgentMessage(
-            agent_type=AgentType.SYSTEM, content="任务开始处理"
-        ).model_dump_json(),
+        AgentMessage(agent_type=AgentType.SYSTEM, content="任务开始处理"),
     )
 
     # 给一个短暂的延迟，确保 WebSocket 有机会连接
@@ -93,15 +115,11 @@ async def run_modeling_task_async(
     # 在关键步骤发送状态更新
     await redis_manager.publish_message(
         problem.task_id,
-        AgentMessage(
-            agent_type=AgentType.SYSTEM, content="开始执行建模任务"
-        ).model_dump_json(),
+        AgentMessage(agent_type=AgentType.SYSTEM, content="开始执行建模任务"),
     )
 
     # 发送任务完成状态
     await redis_manager.publish(
         f"task:{problem.task_id}:messages",
-        AgentMessage(
-            agent_type=AgentType.SYSTEM, content="任务处理完成"
-        ).model_dump_json(),
+        AgentMessage(agent_type=AgentType.SYSTEM, content="任务处理完成"),
     )

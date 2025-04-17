@@ -1,5 +1,3 @@
-import os
-
 tools = [
     {
         "type": "function",
@@ -22,16 +20,3 @@ tools = [
         },
     },
 ]
-
-
-def execute_code():
-    pass
-
-
-# 获取当前路径下的所有文件
-def get_all_files(path: str):
-    all_files = []
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            all_files.append(os.path.join(root, file))
-    return all_files

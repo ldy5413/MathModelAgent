@@ -2,6 +2,7 @@ import redis.asyncio as aioredis
 from typing import Optional
 from app.config.setting import settings
 from app.schemas.response import AgentMessage
+from app.utils.log_util import logger
 
 
 class RedisManager:
@@ -16,6 +17,7 @@ class RedisManager:
                 decode_responses=True,
                 max_connections=settings.REDIS_MAX_CONNECTIONS,
             )
+        logger.info(f"Redis 连接建立成功: {self.redis_url}")
         return self._client
 
     async def set(self, key: str, value: str):
@@ -28,7 +30,13 @@ class RedisManager:
         """发布消息到特定任务的频道"""
         client = await self.get_client()
         channel = f"task:{task_id}:messages"
-        await client.publish(channel, message.model_dump_json())
+        try:
+            message_json = message.model_dump_json()
+            await client.publish(channel, message_json)
+            logger.debug(f"消息已发布到频道 {channel}: {message_json}")
+        except Exception as e:
+            logger.error(f"发布消息失败: {str(e)}")
+            raise
 
     async def subscribe_to_task(self, task_id: str):
         """订阅特定任务的消息"""

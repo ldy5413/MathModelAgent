@@ -21,7 +21,7 @@ def create_work_dir(task_id: str) -> str:
 
     # 检查目录是否已存在
     if not os.path.exists(work_dir):
-        os.path.makedirs(work_dir)
+        os.makedirs(work_dir)
     else:
         print(f"目录已存在: {work_dir}")
 
@@ -35,6 +35,11 @@ def get_work_dir(task_id: str) -> str:
     else:
         logger.error(f"工作目录不存在: {work_dir}")
         raise FileNotFoundError(f"工作目录不存在: {work_dir}")
+
+
+def get_config_template(comp_template: CompTemplate) -> dict:
+    if comp_template == CompTemplate.CHINA:
+        return load_toml(os.path.join("app", "config", "md_template.toml"))
 
 
 def load_toml(path: str) -> dict:
@@ -84,8 +89,3 @@ def simple_chat(model: LLM, history: list) -> str:
     completion = model.client.chat.completions.create(**kwargs)
 
     return completion.choices[0].message.content
-
-
-def get_config_template(comp_template: CompTemplate) -> dict:
-    if comp_template == CompTemplate.CHINA:
-        return load_toml(os.path.join("app", "config", "md_template.toml"))

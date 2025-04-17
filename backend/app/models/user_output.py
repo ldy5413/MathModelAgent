@@ -3,7 +3,7 @@ from app.utils.data_recorder import DataRecorder
 
 
 class UserOutput:
-    def __init__(self, work_dir: str, data_recorder: DataRecorder):
+    def __init__(self, work_dir: str, data_recorder: DataRecorder | None = None):
         self.work_dir = work_dir
         self.res: dict[str, str] = {
             # "eda": "",

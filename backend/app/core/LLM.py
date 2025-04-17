@@ -5,7 +5,7 @@ from app.utils.log_util import logger
 import time
 from app.schemas.response import AgentMessage
 from app.utils.enums import AgentType
-from app.utils.redis_manager import redis_async_client
+from app.utils.redis_manager import redis_manager
 
 
 class LLM:
@@ -94,24 +94,18 @@ class LLM:
         agent_type = AgentType.CODER if agent_name == "CoderAgent" else AgentType.WRITER
         agent_msg = AgentMessage(
             agent_type=agent_type,
-            code=code,
             content=content,
         )
-        print(f"发送消息: {agent_msg.model_dump_json()}")  # 调试输出
+        if code:
+            agent_msg.code = code
 
         await self._push_to_websocket(agent_msg)
 
     async def _push_to_websocket(self, agent_msg: AgentMessage):
-        # 将同步方法改为异步方法
-        async def _async_push():
-            await redis_async_client.publish(
-                f"task:{self.task_id}:messages",
-                agent_msg.model_dump_json(),
-            )
-
-        # 在同步上下文中运行异步任务
-
-        await _async_push()
+        await redis_manager.publish_message(
+            self.task_id,
+            agent_msg,
+        )
 
 
 class DeepSeekModel(LLM):

@@ -2,12 +2,13 @@ import os
 import re
 from typing import Any
 from e2b_code_interpreter import Sandbox
-from app.schemas.response import CodeExecutionResult, AgentMessage
+from app.schemas.response import CodeExecutionResult, CoderMessage
 from app.utils.enums import AgentType
-from app.utils.redis_manager import redis_async_client
+from app.utils.redis_manager import redis_manager
 from app.utils.notebook_serializer import NotebookSerializer
 from app.utils.log_util import logger
 import asyncio
+from app.config.setting import settings
 
 
 def delete_color_control_char(string):
@@ -17,34 +18,67 @@ def delete_color_control_char(string):
 
 class E2BCodeInterpreter:
     def __init__(
-        self, workd_dir: dict, task_id: str, notebook_serializer: NotebookSerializer
+        self,
+        workd_dir: str,
+        task_id: str,
+        notebook_serializer: NotebookSerializer,
     ):
-        self.work_dir = workd_dir  # 工作目录
-        self.sbx = Sandbox(timeout=60 * 20)
+        self.work_dir = workd_dir
+        self.sbx = None
         self.task_id = task_id
         self.notebook_serializer = notebook_serializer
-        # 保存coder_agent 在 jupyter 中执行的 output 结果内容
         self.section_output: dict[str, dict[str, list[str]]] = {}
-        # {
-        #     "eda": {
-        #         "content":["xxxx",],
-        #         "images":["aa.png"]
-        #     },
-        # }
-        self.created_images: list[str] = []  # 当前求解创建的图片
+        self.created_images: list[str] = []
 
         # 在初始化时调用异步初始化方法
         asyncio.create_task(self._initialize())
 
     async def _initialize(self):
-        """异步初始化方法"""
-        await self._pre_execute_code()
-        await self._upload_all_files()
+        """异步初始化沙箱环境"""
+        try:
+            self.sbx = await Sandbox.create(api_key=settings.E2B_API_KEY)
+            logger.info("沙箱环境初始化成功")
+            await self._pre_execute_code()
+            await self._upload_all_files()
+        except Exception as e:
+            logger.error(f"初始化沙箱环境失败: {str(e)}")
+            raise
 
     async def _upload_all_files(self):
-        for file in os.listdir(self.dirs["data"]):
-            with open(os.path.join(self.dirs["data"], file), "rb") as f:
-                await self.sbx.files.write(file, f)
+        """上传工作目录中的所有文件到沙箱"""
+        try:
+            logger.info(f"开始上传文件，工作目录: {self.work_dir}")
+            if not os.path.exists(self.work_dir):
+                logger.error(f"工作目录不存在: {self.work_dir}")
+                raise FileNotFoundError(f"工作目录不存在: {self.work_dir}")
+
+            files = os.listdir(self.work_dir)
+            logger.info(f"工作目录中的文件列表: {files}")
+
+            for file in files:
+                file_path = os.path.join(self.work_dir, file)
+                logger.info(f"处理文件: {file_path}")
+
+                if os.path.isfile(file_path):
+                    try:
+                        with open(file_path, "rb") as f:
+                            content = f.read()
+                            # 使用 files API 上传文件
+                            await self.sbx.files.write(f"/home/user/{file}", content)
+                            logger.info(f"成功上传文件到沙箱: {file}")
+                    except Exception as e:
+                        logger.error(f"上传文件 {file} 失败: {str(e)}")
+                        raise
+                else:
+                    logger.info(f"跳过目录: {file_path}")
+
+            # 验证上传的文件
+            uploaded_files = await self.sbx.files.list("/home/user")
+            logger.info(f"沙箱中的文件列表: {[f.name for f in uploaded_files]}")
+
+        except Exception as e:
+            logger.error(f"文件上传过程失败: {str(e)}")
+            raise
 
     async def _pre_execute_code(self):
         init_code = (
@@ -58,59 +92,57 @@ class E2BCodeInterpreter:
         await self.execute_code(init_code)
 
     async def execute_code(self, code: str) -> tuple[str, list[str, Any], bool, str]:
-        print("执行代码")
+        """执行代码并返回结果"""
+        if not self.sbx:
+            raise RuntimeError("沙箱环境未初始化")
+
+        logger.info(f"执行代码: {code}")
         self.notebook_serializer.add_code_cell_to_notebook(code)
 
         text_to_gpt: list[str] = []
-        content_to_display: list[tuple[str, Any]] = []  # 发送给前端
+        content_to_display: list[tuple[str, Any]] = []
         error_occurred: bool = False
         error_message: str = ""
 
-        execution = self.sbx.run_code(code)
-        # 处理错误
-        if execution.error:
+        try:
+            # 执行 Python 代码
+            result = await self.sbx.run_python(code)
+
+            # 处理错误
+            if result.error:
+                error_occurred = True
+                error_message = str(result.error)
+                text_to_gpt.append(delete_color_control_char(error_message))
+                content_to_display.append(("error", str(error_message)))
+
+            # 处理标准输出
+            if result.stdout:
+                stdout_str = str(result.stdout)
+                text_to_gpt.append(stdout_str)
+                content_to_display.append(("text", stdout_str))
+                self.notebook_serializer.add_code_cell_output_to_notebook(stdout_str)
+
+            # 处理执行结果
+            if result.output:
+                text_to_gpt.append(str(result.output))
+                content_to_display.append(("text", str(result.output)))
+                self.notebook_serializer.add_code_cell_output_to_notebook(result.output)
+
+            # 保存到分段内容
+            for val in content_to_display:
+                self.add_section(val[0])
+                self.add_content(val[0], val[1])
+
+            await self._push_to_websocket(content_to_display, error_message)
+
+        except Exception as e:
+            logger.error(f"代码执行失败: {str(e)}")
             error_occurred = True
-            error_message = (
-                execution.error.name
-                + "\n"
-                + execution.error.value
-                + "\n"
-                + execution.error.traceback
-            )
-            text_to_gpt.append(delete_color_control_char(error_message))
-            content_to_display.append(("error", str(error_message)))
+            error_message = str(e)
+            text_to_gpt.append(error_message)
+            content_to_display.append(("error", error_message))
+            await self._push_to_websocket(content_to_display, error_message)
 
-        # 处理标准输出
-        if execution.logs.stdout:
-            stdout_str = str(execution.logs.stdout)  # 确保转换为字符串
-            text_to_gpt.append(stdout_str)
-            content_to_display.append(("text", stdout_str))
-            self.notebook_serializer.add_code_cell_output_to_notebook(stdout_str)
-
-        # 处理执行结果
-        for res in execution.results:
-            # 处理文本结果
-            if res.text:
-                text_to_gpt.append(str(res.text))  # 确保转换为字符串
-                content_to_display.append(("text", str(res.text)))
-                self.notebook_serializer.add_code_cell_output_to_notebook(res.text)
-
-            # 处理图片结果
-            if res.png:
-                text_to_gpt.append("[image]")
-                content_to_display.append(("image/png", res.png))
-                self.notebook_serializer.add_image_to_notebook(res.png, "image/png")
-
-            elif res.jpeg:
-                text_to_gpt.append("[image]")
-                content_to_display.append(("image/jpeg", res.jpeg))
-                self.notebook_serializer.add_image_to_notebook(res.jpeg, "image/jpeg")
-
-        # 保存到分段内容
-        for val in content_to_display:
-            self.add_section(val[0])
-            self.add_content(val[0], val[1])
-        await self._push_to_websocket(content_to_display, error_message)
         return (
             "\n".join(text_to_gpt),
             content_to_display,
@@ -123,14 +155,14 @@ class E2BCodeInterpreter:
             content=content_to_display,
             error=error_message,
         )
-        agent_msg = AgentMessage(
+        agent_msg = CoderMessage(
             agent_type=AgentType.CODER,
             code_result=code_execution_result,
         )
-        print(f"发送消息: {agent_msg.model_dump_json()}")  # 调试输出
-        await redis_async_client.publish(
+        logger.debug(f"发送消息: {agent_msg.model_dump_json()}")
+        await redis_manager.publish_message(
             f"task:{self.task_id}:messages",
-            agent_msg.model_dump_json(),
+            agent_msg,
         )
 
     def get_created_images(self, section: str) -> list[str]:
@@ -159,14 +191,38 @@ class E2BCodeInterpreter:
         """获取指定section的代码输出"""
         return "\n".join(self.section_output[section]["content"])
 
-    def download_all_files_from_sandbox(self) -> dict:
-        """下载沙盒中的所有文件"""
-        logger.info("下载沙盒中的所有文件")
-        for file in self.sbx.files.list("./"):
-            with open(os.path.join(self.dirs["jupyter"], file.name), "wb") as f:
-                f.write(file)
+    async def cleanup(self):
+        """清理资源并关闭沙箱"""
+        try:
+            if self.sbx:
+                await self.download_all_files_from_sandbox()
+                await self.sbx.close()
+                logger.info("成功关闭沙箱环境")
+        except Exception as e:
+            logger.error(f"清理沙箱环境失败: {str(e)}")
+            raise
 
-    def shotdown_sandbox(self):
-        logger.info("关闭沙盒")
-        self.download_all_files_from_sandbox()
-        self.sbx.kill()
+    async def download_all_files_from_sandbox(self) -> None:
+        """从沙箱中下载所有文件"""
+        try:
+            files = await self.sbx.files.list("/home/user")
+            for file in files:
+                if file.is_file():
+                    content = await self.sbx.files.read(file.path)
+                    output_path = os.path.join(self.work_dir, file.name)
+                    with open(output_path, "wb") as f:
+                        f.write(content)
+                    logger.info(f"成功下载文件: {file.name}")
+        except Exception as e:
+            logger.error(f"下载文件失败: {str(e)}")
+            raise
+
+    async def shutdown_sandbox(self):
+        """关闭沙箱环境"""
+        logger.info("关闭沙箱环境")
+        await self.cleanup()
+
+    def __del__(self):
+        """析构函数，确保资源被正确清理"""
+        if self.sbx:
+            asyncio.create_task(self.cleanup())
