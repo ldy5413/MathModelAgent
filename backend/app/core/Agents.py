@@ -1,4 +1,5 @@
 import json
+from math import log
 from app.core.llm import LLM
 from app.core.prompts import (
     get_completion_check_prompt,
@@ -14,6 +15,7 @@ from app.utils.enums import CompTemplate, FormatOutPut
 from app.utils.log_util import logger
 from app.utils.RichPrinter import RichPrinter
 from app.config.setting import settings
+from app.tools.code_interpreter import E2BCodeInterpreter
 
 
 class Agent:
@@ -40,7 +42,7 @@ class Agent:
             str: 模型的响应
         """
         try:
-            RichPrinter.agent_start(self.__class__.__name__)
+            logger.info(f"{self.__class__.__name__}:开始:执行对话")
             self.current_chat_turns = 0  # 重置对话轮次计数器
 
             # 更新对话历史
@@ -53,8 +55,7 @@ class Agent:
             )
             response_content = response.choices[0].message.content
             self.chat_history.append({"role": "assistant", "content": response_content})
-
-            RichPrinter.agent_end(self.__class__.__name__)
+            logger.info(f"{self.__class__.__name__}:完成:执行对话")
             return response_content
         except Exception as e:
             error_msg = f"执行过程中遇到错误: {str(e)}"
@@ -86,12 +87,14 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         work_dir: str,  # 工作目录
         max_chat_turns: int = settings.MAX_CHAT_TURNS,  # 最大聊天次数
         max_retries: int = settings.MAX_RETRIES,  # 最大反思次数
+        code_interpreter: E2BCodeInterpreter = None,
     ) -> None:
         super().__init__(model, max_chat_turns)
         self.work_dir = work_dir
         self.max_retries = max_retries
         self.is_first_run = True
         self.system_prompt = CODER_PROMPT
+        self.code_interpreter = code_interpreter
 
     async def run(self, prompt: str, subtask_title: str) -> CoderToWriter:
         logger.info(f"{self.__class__.__name__}:开始:执行子任务: {subtask_title}")
@@ -229,6 +232,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
 
 # 长文本
 # TODO: 并行 parallel
+# TODO: 获取当前文件下的文件
 class WriterAgent(Agent):  # 同样继承自Agent类
     def __init__(
         self,

@@ -17,9 +17,9 @@ def delete_color_control_char(string):
 
 class E2BCodeInterpreter:
     def __init__(
-        self, dirs: dict, task_id: str, notebook_serializer: NotebookSerializer
+        self, workd_dir: dict, task_id: str, notebook_serializer: NotebookSerializer
     ):
-        self.dirs = dirs  # project / work_dir / task_id /
+        self.work_dir = workd_dir  # 工作目录
         self.sbx = Sandbox(timeout=60 * 20)
         self.task_id = task_id
         self.notebook_serializer = notebook_serializer
