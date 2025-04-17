@@ -1,6 +1,5 @@
 import json
 from openai import OpenAI
-from app.utils.RichPrinter import RichPrinter
 from app.utils.log_util import logger
 import time
 from app.schemas.response import AgentMessage
@@ -59,21 +58,13 @@ class LLM:
                 return completion
             except json.JSONDecodeError:
                 logger.error(f"第{attempt + 1}次重试: API返回无效JSON")
-                time.sleep(retry_delay * (attempt + 1))
-            except Exception as e:
-                logger.error(
-                    f"API调用失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}"
-                )
                 if attempt < max_retries - 1:  # 如果不是最后一次尝试
                     time.sleep(retry_delay * (attempt + 1))  # 指数退避
                     continue
                 logger.debug(f"请求参数: {kwargs}")
                 raise  # 如果所有重试都失败，则抛出异常
 
-    async def analyse_completion(self, completion, agent_name: str):
-        await self.print_msg(completion, agent_name)
-
-    async def print_msg(self, completion, agent_name):
+    async def analyse_completion(self, completion, agent_name):
         code = ""
         if (
             hasattr(completion.choices[0].message, "tool_calls")
@@ -82,23 +73,21 @@ class LLM:
             tool_call = completion.choices[0].message.tool_calls[0]
             if tool_call.function.name == "execute_code":
                 code = json.loads(tool_call.function.arguments)["code"]
-
         await self.send_message(agent_name, completion.choices[0].message.content, code)
-
-        RichPrinter.print_agent_msg(
-            completion.choices[0].message.content + code, agent_name=agent_name
-        )
         logger.debug(completion)
 
-    async def send_message(self, agent_name, content, code=None):
-        agent_type = AgentType.CODER if agent_name == "CoderAgent" else AgentType.WRITER
+    async def send_message(self, agent_name, content, code=""):
+        if agent_name == "CoderAgent":
+            agent_type = AgentType.CODER
+        elif agent_name == "WriterAgent":
+            agent_type = AgentType.WRITER
+        else:
+            raise ValueError(f"无效的agent_name: {agent_name}")
+
         agent_msg = AgentMessage(
             agent_type=agent_type,
-            content=content,
+            content=content + code,
         )
-        if code:
-            agent_msg.code = code
-
         await self._push_to_websocket(agent_msg)
 
     async def _push_to_websocket(self, agent_msg: AgentMessage):

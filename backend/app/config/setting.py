@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     @classmethod
     def from_env(cls, env: str = None):
         env = env or os.getenv("ENV", "dev")
-        env_file = f".env.{env.lower}"
+        env_file = f".env.{env.lower()}"
         return cls(_env_file=env_file, _env_file_encoding="utf-8")
 
 

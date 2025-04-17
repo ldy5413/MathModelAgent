@@ -184,7 +184,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                     if error_occurred:
                         retry_count += 1
                         last_error_message = error_message
-                        reflection_prompt = get_reflection_prompt()
+                        reflection_prompt = get_reflection_prompt(error_message, code)
 
                         self.append_chat_history(
                             {"role": "user", "content": reflection_prompt}

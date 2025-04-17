@@ -19,13 +19,14 @@ def create_work_dir(task_id: str) -> str:
     # 设置主工作目录和子目录
     work_dir = os.path.join("project", "work_dir", task_id)
 
-    # 检查目录是否已存在
-    if not os.path.exists(work_dir):
-        os.makedirs(work_dir)
-    else:
-        print(f"目录已存在: {work_dir}")
-
-    return work_dir
+    try:
+        # 创建目录，如果目录已存在也不会报错
+        os.makedirs(work_dir, exist_ok=True)
+        return work_dir
+    except Exception as e:
+        # 捕获并记录创建目录时的异常
+        logger.error(f"创建工作目录失败: {str(e)}")
+        raise
 
 
 def get_work_dir(task_id: str) -> str:

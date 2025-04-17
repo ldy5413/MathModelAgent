@@ -9,6 +9,9 @@ from app.utils.notebook_serializer import NotebookSerializer
 from app.utils.log_util import logger
 import asyncio
 from app.config.setting import settings
+from e2b_code_interpreter.models import (
+    Execution,
+)
 
 
 def delete_color_control_char(string):
@@ -36,7 +39,7 @@ class E2BCodeInterpreter:
     async def _initialize(self):
         """异步初始化沙箱环境"""
         try:
-            self.sbx = await Sandbox.create(api_key=settings.E2B_API_KEY)
+            self.sbx = Sandbox(api_key=settings.E2B_API_KEY)
             logger.info("沙箱环境初始化成功")
             await self._pre_execute_code()
             await self._upload_all_files()
@@ -64,7 +67,7 @@ class E2BCodeInterpreter:
                         with open(file_path, "rb") as f:
                             content = f.read()
                             # 使用 files API 上传文件
-                            await self.sbx.files.write(f"/home/user/{file}", content)
+                            self.sbx.files.write(f"/home/user/{file}", content)
                             logger.info(f"成功上传文件到沙箱: {file}")
                     except Exception as e:
                         logger.error(f"上传文件 {file} 失败: {str(e)}")
@@ -73,7 +76,7 @@ class E2BCodeInterpreter:
                     logger.info(f"跳过目录: {file_path}")
 
             # 验证上传的文件
-            uploaded_files = await self.sbx.files.list("/home/user")
+            uploaded_files = self.sbx.files.list("/home/user")
             logger.info(f"沙箱中的文件列表: {[f.name for f in uploaded_files]}")
 
         except Exception as e:
@@ -106,27 +109,53 @@ class E2BCodeInterpreter:
 
         try:
             # 执行 Python 代码
-            result = await self.sbx.run_python(code)
+            logger.info("开始在沙箱中执行代码...")
+            execution = self.sbx.run_code(code)  # 返回 Execution 对象
+            logger.info("代码执行完成，开始处理结果...")
 
-            # 处理错误
-            if result.error:
-                error_occurred = True
-                error_message = str(result.error)
-                text_to_gpt.append(delete_color_control_char(error_message))
-                content_to_display.append(("error", str(error_message)))
+            # 处理标准输出和标准错误
+            if execution.logs:
+                if execution.logs.stdout:
+                    stdout_str = "\n".join(execution.logs.stdout)
+                    logger.info(f"标准输出: {stdout_str}")
+                    text_to_gpt.append(stdout_str)
+                    content_to_display.append(("text", stdout_str))
+                    self.notebook_serializer.add_code_cell_output_to_notebook(
+                        stdout_str
+                    )
 
-            # 处理标准输出
-            if result.stdout:
-                stdout_str = str(result.stdout)
-                text_to_gpt.append(stdout_str)
-                content_to_display.append(("text", stdout_str))
-                self.notebook_serializer.add_code_cell_output_to_notebook(stdout_str)
+                if execution.logs.stderr:
+                    stderr_str = "\n".join(execution.logs.stderr)
+                    logger.warning(f"标准错误: {stderr_str}")
+                    text_to_gpt.append(stderr_str)
+                    content_to_display.append(("error", stderr_str))
 
             # 处理执行结果
-            if result.output:
-                text_to_gpt.append(str(result.output))
-                content_to_display.append(("text", str(result.output)))
-                self.notebook_serializer.add_code_cell_output_to_notebook(result.output)
+            if execution.results:
+                for result in execution.results:
+                    # 处理主要结果
+                    if result.is_main_result and result.text:
+                        logger.info(f"主要结果: {result.text}")
+                        text_to_gpt.append(result.text)
+                        content_to_display.append(("text", result.text))
+                        self.notebook_serializer.add_code_cell_output_to_notebook(
+                            result.text
+                        )
+
+                    # 处理图表结果
+                    if result.chart:
+                        logger.info("发现图表结果")
+                        chart_data = result.chart.to_dict()
+                        text_to_gpt.append(str(chart_data))
+                        content_to_display.append(("chart", chart_data))
+
+            # 处理执行错误
+            if execution.error:
+                error_occurred = True
+                error_message = f"{execution.error.name}: {execution.error.value}\n{execution.error.traceback}"
+                logger.error(f"执行错误: {error_message}")
+                text_to_gpt.append(delete_color_control_char(error_message))
+                content_to_display.append(("error", error_message))
 
             # 保存到分段内容
             for val in content_to_display:
@@ -134,9 +163,10 @@ class E2BCodeInterpreter:
                 self.add_content(val[0], val[1])
 
             await self._push_to_websocket(content_to_display, error_message)
+            logger.info("执行结果已推送到WebSocket")
 
         except Exception as e:
-            logger.error(f"代码执行失败: {str(e)}")
+            logger.error(f"代码执行过程中发生异常: {str(e)}")
             error_occurred = True
             error_message = str(e)
             text_to_gpt.append(error_message)
