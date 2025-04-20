@@ -40,6 +40,8 @@ class MathModelWorkFlow(WorkFlow):
             task_id=self.task_id,
         )
 
+        self.format_questions(problem.ques_all, deepseek_model)
+
         user_output = UserOutput(work_dir=self.work_dir)
 
         notebook_serializer = NotebookSerializer(work_dir=self.work_dir)
@@ -47,6 +49,7 @@ class MathModelWorkFlow(WorkFlow):
             workd_dir=self.work_dir,
             task_id=self.task_id,
             notebook_serializer=notebook_serializer,
+            timeout=3000,
         )
 
         coder_agent = CoderAgent(
@@ -126,6 +129,7 @@ class MathModelWorkFlow(WorkFlow):
         try:
             self.questions = json.loads(json_str)
             self.ques_count = self.questions["ques_count"]
+            logger.info(f"questions:{self.questions}")
         except json.JSONDecodeError as e:
             raise ValueError(f"JSON 解析错误: {e}")
 
@@ -182,7 +186,7 @@ class MathModelWorkFlow(WorkFlow):
         questions_quesx_keys = self.get_questions_quesx_keys()
         # TODO： 小标题编号
         # 题号最多6题
-        bgc = self.get_questions()["background"]
+        bgc = self.questions["background"]
         quesx_writer_prompt = {
             key: f"""
                     问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{config_template[key]}

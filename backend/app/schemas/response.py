@@ -4,8 +4,8 @@ from typing import Any
 
 
 class CodeExecutionResult(BaseModel):
-    content: list[tuple[str, Any]]
-    error: str | None = None
+    msg_type: str
+    msg: str
 
 
 class AgentMessage(BaseModel):

@@ -12,9 +12,9 @@ from app.models.model import CoderToWriter
 from app.models.user_output import UserOutput
 from app.utils.enums import CompTemplate, FormatOutPut
 from app.utils.log_util import logger
-from app.utils.RichPrinter import RichPrinter
 from app.config.setting import settings
 from app.tools.code_interpreter import E2BCodeInterpreter
+from app.utils.common_utils import get_current_files
 
 
 class Agent:
@@ -103,6 +103,13 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         if self.is_first_run:
             self.is_first_run = False
             self.append_chat_history({"role": "system", "content": self.system_prompt})
+            # 当前数据集文件
+            self.append_chat_history(
+                {
+                    "role": "user",
+                    "content": f"当前文件夹下的数据集文件{get_current_files(self.work_dir, 'data')}",
+                }
+            )
 
         self.append_chat_history({"role": "user", "content": prompt})
 
@@ -165,7 +172,6 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                     # 执行工具调用
                     (
                         text_to_gpt,
-                        _,
                         error_occurred,
                         error_message,
                     ) = await self.code_interpreter.execute_code(code)
@@ -193,7 +199,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
 
                     # 检查任务完成情况时也计入对话轮次
                     self.current_chat_turns += 1
-                    # 使用π所有执行结果生成检查提示
+                    # 使用所有执行结果生成检查提示
                     completion_check_prompt = get_completion_check_prompt(
                         prompt, text_to_gpt
                     )
@@ -210,12 +216,12 @@ class CoderAgent(Agent):  # 同样继承自Agent类
 
                     # # TODO: 压缩对话历史
 
+                    ## 没有调用工具，代表已经完成了
                     if not (
                         hasattr(completion_response.choices[0].message, "tool_calls")
                         and completion_response.choices[0].message.tool_calls
                     ):
                         task_completed = True
-                        RichPrinter.agent_end(self.__class__.__name__)
                         return completion_response.choices[0].message.content
 
             if retry_count >= self.max_retries:

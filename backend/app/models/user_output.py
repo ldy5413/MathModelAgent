@@ -29,10 +29,6 @@ class UserOutput:
 
         return model_build_solve
 
-    def print_summary(self):
-        """打印统计摘要"""
-        pass
-
     def get_result_to_save(self, ques_count):
         # 动态顺序获取拼接res value，正确拼接顺序
         ques_str = [f"ques{i}" for i in range(1, ques_count + 1)]
@@ -48,7 +44,7 @@ class UserOutput:
             "judge",
             "reference",
         ]
-        return "\n".join([self.res[key] for key in seq])
+        return "\n".join([self.res.get(key, "") for key in seq])
 
     def save_result(self, ques_count):
         res_path = os.path.join(self.work_dir, "res.md")

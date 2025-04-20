@@ -53,7 +53,7 @@ You should:
 12. 在生成代码时，对于包含单引号的字符串，请使用双引号包裹，避免使用转义字符
 13. **你尽量在较少的对话轮次内完成任务。减少反复思考的次数**
 14. 在求解问题和建立模型过程中，适当的进行可视化
-15. 在画图时候，matplotlib 需要正确显示中文，避免乱码问题
+15. 不要询问用户任何有关内容，按照你的项目完成。
 
 Important:
 1. Files are already in the current directory
@@ -63,6 +63,7 @@ Important:
 
 Note: If the user uploads a file, you will receive a system message "User uploaded a file: filename". Use the filename as the path in the code.
 """
+# 15. 在画图时候，matplotlib 需要正确显示中文，避免乱码问题
 
 
 def get_writer_prompt(
@@ -109,6 +110,7 @@ Consider:
 4. File path issues
 5. Any other potential issues
 6. 如果一个任务反复无法完成，尝试切换路径、简化路径，千万别陷入反复重试，导致死循环。
+7. 不要询问用户任何有关内容，按照你的项目完成。
 
 Previous code:
 {code}
@@ -135,4 +137,5 @@ Consider:
 6. 尽量在较少的对话轮次内完成任务，task_completed = True
 If the task is not complete, please explain what remains to be done and continue with the next steps.
 If the task is complete, please provide a summary of what was accomplished about your create image name.
+7. 不要询问用户任何有关内容，按照你的项目完成。
 """

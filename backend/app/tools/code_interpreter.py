@@ -1,7 +1,7 @@
 import os
 import re
 from typing import Any
-from e2b_code_interpreter import Sandbox, AsyncSandbox
+from e2b_code_interpreter import AsyncSandbox
 from app.schemas.response import CodeExecutionResult, CoderMessage
 from app.utils.enums import AgentType
 from app.utils.redis_manager import redis_manager
@@ -9,9 +9,6 @@ from app.utils.notebook_serializer import NotebookSerializer
 from app.utils.log_util import logger
 import asyncio
 from app.config.setting import settings
-from e2b_code_interpreter.models import (
-    Execution,
-)
 
 
 def delete_color_control_char(string):
@@ -39,16 +36,19 @@ class E2BCodeInterpreter:
         workd_dir: str,
         task_id: str,
         notebook_serializer: NotebookSerializer,
+        timeout,
     ) -> "E2BCodeInterpreter":
         """创建并初始化 E2BCodeInterpreter 实例"""
         instance = cls(workd_dir, task_id, notebook_serializer)
-        await instance.initialize()
+        await instance.initialize(timeout=timeout)
         return instance
 
-    async def initialize(self):
+    async def initialize(self, timeout: int = 3000):
         """异步初始化沙箱环境"""
         try:
-            self.sbx = await AsyncSandbox.create(api_key=settings.E2B_API_KEY)
+            self.sbx = await AsyncSandbox.create(
+                api_key=settings.E2B_API_KEY, timeout=timeout
+            )
             logger.info("沙箱环境初始化成功")
             await self._pre_execute_code()
             await self._upload_all_files()
@@ -64,7 +64,10 @@ class E2BCodeInterpreter:
                 logger.error(f"工作目录不存在: {self.work_dir}")
                 raise FileNotFoundError(f"工作目录不存在: {self.work_dir}")
 
-            files = os.listdir(self.work_dir)
+            # 只上传数据集文件
+            files = [
+                f for f in os.listdir(self.work_dir) if f.endswith((".csv", ".xlsx"))
+            ]
             logger.info(f"工作目录中的文件列表: {files}")
 
             for file in files:
@@ -95,19 +98,9 @@ class E2BCodeInterpreter:
     async def _pre_execute_code(self):
         init_code = (
             "import matplotlib.pyplot as plt\n"
-            "import matplotlib as mpl\n"
-            # 更通用的中文字体配置
-            "import platform\n"
-            "if platform.system() == 'Darwin':  # macOS\n"
-            "    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang HK', 'STHeiti Light', 'Heiti TC']\n"
-            "elif platform.system() == 'Windows':  # Windows\n"
-            "    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS']\n"
-            "else:  # Linux\n"
-            "    plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei', 'Droid Sans Fallback', 'Arial Unicode MS']\n"
-            "\n"
-            "plt.rcParams['axes.unicode_minus'] = False\n"
-            "plt.rcParams['font.family'] = 'sans-serif'\n"
-            "mpl.rcParams['figure.dpi'] = 300\n"  # 提高DPI以获得更清晰的显示
+            # "plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial Unicode MS']\n"
+            # "plt.rcParams['axes.unicode_minus'] = False\n"
+            # "plt.rcParams['font.family'] = 'sans-serif'\n"
         )
         await self.execute_code(init_code)
 
@@ -119,7 +112,7 @@ class E2BCodeInterpreter:
         half_length = max_length // 2
         return text[:half_length] + "\n... (内容已截断) ...\n" + text[-half_length:]
 
-    async def execute_code(self, code: str) -> tuple[str, list[str, Any], bool, str]:
+    async def execute_code(self, code: str) -> tuple[str, bool, str]:
         """执行代码并返回结果"""
         if not self.sbx:
             raise RuntimeError("沙箱环境未初始化")
@@ -128,99 +121,85 @@ class E2BCodeInterpreter:
         self.notebook_serializer.add_code_cell_to_notebook(code)
 
         text_to_gpt: list[str] = []
-        content_to_display: list[tuple[str, Any]] = []
+        content_to_display = []
         error_occurred: bool = False
         error_message: str = ""
 
-        try:
-            # 执行 Python 代码
-            logger.info("开始在沙箱中执行代码...")
-            execution = await self.sbx.run_code(code)  # 返回 Execution 对象
-            logger.info("代码执行完成，开始处理结果...")
+        # 执行 Python 代码
+        logger.info("开始在沙箱中执行代码...")
+        execution = await self.sbx.run_code(code)  # 返回 Execution 对象
+        logger.info("代码执行完成，开始处理结果...")
 
-            # 处理标准输出和标准错误
-            if execution.logs:
-                if execution.logs.stdout:
-                    stdout_str = "\n".join(execution.logs.stdout)
-                    stdout_str = self._truncate_text(stdout_str)
-                    logger.info(f"标准输出: {stdout_str}")
-                    text_to_gpt.append(stdout_str)
-                    content_to_display.append(("text", stdout_str))
-                    self.notebook_serializer.add_code_cell_output_to_notebook(
-                        stdout_str
-                    )
+        # 处理执行错误
+        if execution.error:
+            error_occurred = True
+            error_message = f"Error: {execution.error.name}: {execution.error.value}\n{execution.error.traceback}"
+            error_message = self._truncate_text(error_message)
+            logger.error(f"执行错误: {error_message}")
+            text_to_gpt.append(delete_color_control_char(error_message))
+            content_to_display.append(("error", error_message))
+        # 处理标准输出和标准错误
 
-                if execution.logs.stderr:
-                    stderr_str = "\n".join(execution.logs.stderr)
-                    stderr_str = self._truncate_text(stderr_str)
-                    logger.warning(f"标准错误: {stderr_str}")
-                    text_to_gpt.append(stderr_str)
-                    content_to_display.append(("error", stderr_str))
+        if execution.logs:
+            if execution.logs.stdout:
+                stdout_str = "\n".join(execution.logs.stdout)
+                stdout_str = self._truncate_text(stdout_str)
+                logger.info(f"标准输出: {stdout_str}")
+                text_to_gpt.append(stdout_str)
+                content_to_display.append(("text", stdout_str))
+                self.notebook_serializer.add_code_cell_output_to_notebook(stdout_str)
+
+            if execution.logs.stderr:
+                stderr_str = "\n".join(execution.logs.stderr)
+                stderr_str = self._truncate_text(stderr_str)
+                logger.warning(f"标准错误: {stderr_str}")
+                text_to_gpt.append(stderr_str)
+                content_to_display.append(("error", stderr_str))
 
             # 处理执行结果
-            if execution.results:
-                for result in execution.results:
-                    # 处理主要结果
-                    if result.is_main_result and result.text:
-                        result_text = self._truncate_text(result.text)
-                        logger.info(f"主要结果: {result_text}")
-                        text_to_gpt.append(result_text)
-                        content_to_display.append(("text", result_text))
-                        self.notebook_serializer.add_code_cell_output_to_notebook(
-                            result_text
-                        )
+        if execution.results:
+            for result in execution.results:
+                # 处理主要结果
+                if result.is_main_result and result.text:
+                    result_text = self._truncate_text(result.text)
+                    logger.info(f"主要结果: {result_text}")
+                    text_to_gpt.append(result_text)
+                    content_to_display.append(("text", result_text))
+                    self.notebook_serializer.add_code_cell_output_to_notebook(
+                        result_text
+                    )
 
-                    # 处理图表结果
-                    if result.chart:
-                        logger.info("发现图表结果")
-                        chart_data = result.chart.to_dict()
-                        chart_str = str(chart_data)
-                        if len(chart_str) > 1000:  # 限制图表数据大小
-                            chart_str = "图表数据过大，已省略"
-                        text_to_gpt.append(chart_str)
-                        content_to_display.append(("chart", chart_data))
-
-            # 处理执行错误
-            if execution.error:
-                error_occurred = True
-                error_message = f"{execution.error.name}: {execution.error.value}\n{execution.error.traceback}"
-                error_message = self._truncate_text(error_message)
-                logger.error(f"执行错误: {error_message}")
-                text_to_gpt.append(delete_color_control_char(error_message))
-                content_to_display.append(("error", error_message))
+                # 处理图表结果
+                if result.chart:
+                    logger.info("发现图表结果")
+                    chart_data = result.chart.to_dict()
+                    chart_str = str(chart_data)
+                    if len(chart_str) > 1000:  # 限制图表数据大小
+                        chart_str = "图表数据过大，已省略"
+                    text_to_gpt.append(chart_str)
+                    content_to_display.append(("chart", chart_data))
 
             # 保存到分段内容
-            for val in content_to_display:
-                self.add_section(val[0])
-                self.add_content(val[0], val[1])
+        for val in content_to_display:
+            self.add_section(val[0])
+            self.add_content(val[0], val[1])
+            await self._push_to_websocket(val[0], val[1])
 
-            await self._push_to_websocket(content_to_display, error_message)
-            logger.info("执行结果已推送到WebSocket")
-
-        except Exception as e:
-            logger.error(f"代码执行过程中发生异常: {str(e)}")
-            error_occurred = True
-            error_message = str(e)
-            text_to_gpt.append(error_message)
-            content_to_display.append(("error", error_message))
-            await self._push_to_websocket(content_to_display, error_message)
+        logger.info("执行结果已推送到WebSocket")
 
         # 限制返回的文本总长度
         combined_text = "\n".join(text_to_gpt)
-        if len(combined_text) > 5000:  # 设置一个合理的总长度限制
-            combined_text = self._truncate_text(combined_text, 5000)
 
         return (
             combined_text,
-            content_to_display,
             error_occurred,
             error_message,
         )
 
-    async def _push_to_websocket(self, content_to_display, error_message):
+    async def _push_to_websocket(self, msg_type, msg):
         code_execution_result = CodeExecutionResult(
-            content=content_to_display,
-            error=error_message,
+            msg_type=msg_type,
+            msg=msg,
         )
         agent_msg = CoderMessage(
             agent_type=AgentType.CODER,
@@ -272,7 +251,7 @@ class E2BCodeInterpreter:
         try:
             if self.sbx:
                 await self.download_all_files_from_sandbox()
-                await self.sbx.close()
+                await self.sbx.kill()
                 logger.info("成功关闭沙箱环境")
         except Exception as e:
             logger.error(f"清理沙箱环境失败: {str(e)}")
@@ -285,6 +264,9 @@ class E2BCodeInterpreter:
             for file in files:
                 content = await self.sbx.files.read(file.path)
                 output_path = os.path.join(self.work_dir, file.name)
+                # 修复：确保写入文件时 content 一定是 bytes 类型
+                if isinstance(content, str):
+                    content = content.encode("utf-8")
                 with open(output_path, "wb") as f:
                     f.write(content)
                 logger.info(f"成功下载文件: {file.name}")
@@ -296,6 +278,9 @@ class E2BCodeInterpreter:
         """关闭沙箱环境"""
         logger.info("关闭沙箱环境")
         await self.cleanup()
+
+    async def get_current_all_files_from_sandbox(self) -> list:
+        return await self.sbx.files.list("/home/user")
 
     def __del__(self):
         """析构函数，确保资源被正确清理"""

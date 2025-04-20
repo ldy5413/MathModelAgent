@@ -62,8 +62,10 @@ def get_current_files(folder_path: str, type: str = "all") -> list[str]:
         return [file for file in files if file.endswith(".md")]
     elif type == "ipynb":
         return [file for file in files if file.endswith(".ipynb")]
-    elif type == "xlsx":
-        return [file for file in files if file.endswith(".xlsx")]
+    elif type == "data":
+        return [
+            file for file in files if file.endswith(".xlsx") or file.endswith(".csv")
+        ]
     elif type == "image":
         return [
             file for file in files if file.endswith(".png") or file.endswith(".jpg")
