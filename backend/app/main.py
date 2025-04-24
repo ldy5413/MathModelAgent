@@ -5,6 +5,7 @@ import os
 from app.routers import modeling, ws
 from app.utils.log_util import logger
 from app.config.setting import settings
+from fastapi.staticfiles import StaticFiles
 
 
 @asynccontextmanager
@@ -37,4 +38,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],  # 暴露所有响应头
+)
+
+app.mount(
+    "/static",  # 这是访问时的前缀
+    StaticFiles(directory="project/work_dir"),  # 这是本地文件夹路径
+    name="static",
 )

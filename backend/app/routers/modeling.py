@@ -119,7 +119,7 @@ async def run_modeling_task_async(
     )
 
     # 发送任务完成状态
-    await redis_manager.publish(
+    await redis_manager.publish_message(
         f"task:{problem.task_id}:messages",
         AgentMessage(agent_type=AgentType.SYSTEM, content="任务处理完成"),
     )

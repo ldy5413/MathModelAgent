@@ -1,5 +1,6 @@
 from app.core.agents import WriterAgent, CoderAgent
 from app.core.llm import LLM
+from app.models.model import CoderToWriter
 from app.schemas.request import Problem
 from app.utils.log_util import logger
 from app.utils.common_utils import create_work_dir, simple_chat, get_config_template
@@ -45,6 +46,7 @@ class MathModelWorkFlow(WorkFlow):
         user_output = UserOutput(work_dir=self.work_dir)
 
         notebook_serializer = NotebookSerializer(work_dir=self.work_dir)
+
         e2b_code_interpreter = await E2BCodeInterpreter.create(
             workd_dir=self.work_dir,
             task_id=self.task_id,
@@ -81,7 +83,7 @@ class MathModelWorkFlow(WorkFlow):
                 format_output=problem.format_output,
             )
 
-            writer_response = writer_agent.run(
+            writer_response = await writer_agent.run(
                 writer_prompt,
                 available_images=await e2b_code_interpreter.get_created_images(key),
             )
@@ -101,7 +103,7 @@ class MathModelWorkFlow(WorkFlow):
                 comp_template=problem.comp_template,
                 format_output=problem.format_output,
             )
-            writer_response = writer_agent.run(value)
+            writer_response = await writer_agent.run(value)
             user_output.set_res(key, writer_response)
 
         logger.info(user_output.get_res())

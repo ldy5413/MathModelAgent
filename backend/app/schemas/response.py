@@ -3,14 +3,14 @@ from pydantic import BaseModel
 from typing import Any
 
 
-class CodeExecutionResult(BaseModel):
-    msg_type: str
-    msg: str
-
-
 class AgentMessage(BaseModel):
     agent_type: AgentType
     content: str | None = None
+
+
+class CodeExecutionResult(BaseModel):
+    msg_type: str
+    msg: str
 
 
 class CoderMessage(AgentMessage):

@@ -1,6 +1,5 @@
 import os
 import re
-from typing import Any
 from e2b_code_interpreter import AsyncSandbox
 from app.schemas.response import CodeExecutionResult, CoderMessage
 from app.utils.enums import AgentType
@@ -104,7 +103,7 @@ class E2BCodeInterpreter:
         )
         await self.execute_code(init_code)
 
-    def _truncate_text(self, text: str, max_length: int = 1000) -> str:
+    def _truncate_text(self, text: str, max_length: int = 5000) -> str:
         """截断文本，保留开头和结尾的重要信息"""
         if len(text) <= max_length:
             return text
@@ -174,8 +173,8 @@ class E2BCodeInterpreter:
                     logger.info("发现图表结果")
                     chart_data = result.chart.to_dict()
                     chart_str = str(chart_data)
-                    if len(chart_str) > 1000:  # 限制图表数据大小
-                        chart_str = "图表数据过大，已省略"
+                    # if len(chart_str) > 1000:  # 限制图表数据大小
+                    #     chart_str = "图表数据过大，已省略"
                     text_to_gpt.append(chart_str)
                     content_to_display.append(("chart", chart_data))
 
