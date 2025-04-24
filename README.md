@@ -85,8 +85,16 @@ uv run terminal.py # 启动终端项目
 请勿商业用途，商业用途联系我（作者）
 
 ## 🙏 Reference
+
 Thanks to the following projects:
 - [OpenCodeInterpreter](https://github.com/OpenCodeInterpreter/OpenCodeInterpreter/tree/main)
 - [TaskWeaver](https://github.com/microsoft/TaskWeaver)
 - [Code-Interpreter](https://github.com/MrGreyfun/Local-Code-Interpreter/tree/main)
 - [Latex](https://github.com/Veni222987/MathModelingLatexTemplate/tree/main)
+
+
+## 联系
+
+有问题可以进群问
+
+![](./docs/qq.jpg)
