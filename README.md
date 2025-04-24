@@ -97,4 +97,4 @@ Thanks to the following projects:
 
 有问题可以进群问
 
-![](./docs/qq.jpg)
+<img src="./docs/qq.jpg" height="400px">
