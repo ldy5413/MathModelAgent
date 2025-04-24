@@ -1,7 +1,7 @@
 from models.user_input import UserInput
 from models.user_output import UserOutput
-from core.Agents import CoderAgent
-from core.WorkFlow import SolutionWorkFlow, WriteWorkFlow
+from core.agents import CoderAgent
+from core.workflow import SolutionWorkFlow, WriteWorkFlow
 
 
 class Task:

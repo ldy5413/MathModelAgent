@@ -1,4 +1,4 @@
-from core.Agents import WriterAgent, CoderAgent
+from core.agents import WriterAgent, CoderAgent
 from core.LLM import BaseModel
 from models import user_output
 from utils.logger import log
