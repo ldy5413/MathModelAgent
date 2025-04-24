@@ -8,6 +8,7 @@ from app.utils.notebook_serializer import NotebookSerializer
 from app.utils.log_util import logger
 import asyncio
 from app.config.setting import settings
+import json
 
 
 def delete_color_control_char(string):
@@ -196,6 +197,9 @@ class E2BCodeInterpreter:
         )
 
     async def _push_to_websocket(self, msg_type, msg):
+        # 如果msg不是字符串，转为json字符串
+        if not isinstance(msg, str):
+            msg = json.dumps(msg, ensure_ascii=False)
         code_execution_result = CodeExecutionResult(
             msg_type=msg_type,
             msg=msg,
@@ -247,8 +251,13 @@ class E2BCodeInterpreter:
 
     async def cleanup(self):
         """清理资源并关闭沙箱"""
+
+        if await self.sbx.is_running():
+            logger.error("沙箱已经关闭了")
+
         try:
             if self.sbx:
+                ## TODO: 生成一个文件，下载一份文件
                 await self.download_all_files_from_sandbox()
                 await self.sbx.kill()
                 logger.info("成功关闭沙箱环境")
@@ -271,7 +280,7 @@ class E2BCodeInterpreter:
                 logger.info(f"成功下载文件: {file.name}")
         except Exception as e:
             logger.error(f"下载文件失败: {str(e)}")
-            raise
+            # 这里不再 raise，防止 cleanup 阶段因沙箱已关闭而报错
 
     async def shutdown_sandbox(self):
         """关闭沙箱环境"""

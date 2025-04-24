@@ -2,7 +2,7 @@ import json
 from openai import OpenAI
 from app.utils.log_util import logger
 import time
-from app.schemas.response import AgentMessage
+from app.schemas.response import AgentMessage, CoderMessage, WriterMessage
 from app.utils.enums import AgentType
 from app.utils.redis_manager import redis_manager
 
@@ -78,19 +78,16 @@ class LLM:
 
     async def send_message(self, agent_name, content, code=""):
         if agent_name == "CoderAgent":
-            agent_type = AgentType.CODER
+            agent_msg: CoderMessage = CoderMessage(
+                agent_type=AgentType.CODER, content=content, code=code
+            )
         elif agent_name == "WriterAgent":
-            agent_type = AgentType.WRITER
+            agent_msg: WriterMessage = WriterMessage(
+                agent_type=AgentType.WRITER, content=content
+            )
         else:
             raise ValueError(f"无效的agent_name: {agent_name}")
 
-        agent_msg = AgentMessage(
-            agent_type=agent_type,
-            content=content + code,
-        )
-        await self._push_to_websocket(agent_msg)
-
-    async def _push_to_websocket(self, agent_msg: AgentMessage):
         await redis_manager.publish_message(
             self.task_id,
             agent_msg,

@@ -13,7 +13,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
     print(f"WebSocket 尝试连接 task_id: {task_id}")
 
     redis_async_client = await redis_manager.get_client()
-    if not redis_async_client.get_client().exists(f"task_id:{task_id}"):
+    if not await redis_async_client.exists(f"task_id:{task_id}"):
         print(f"Task not found: {task_id}")
         await websocket.close(code=1008, reason="Task not found")
         return
@@ -41,14 +41,16 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
                 if msg:
                     print(f"Received message: {msg}")
                     try:
-                        agent_msg = AgentMessage.model_validate_json(msg["data"])
+                        agent_msg = msg["data"]
                         await ws_manager.send_personal_message_json(
                             agent_msg, websocket
                         )
                         print(f"Sent message to WebSocket: {agent_msg}")
                     except Exception as e:
                         print(f"Error parsing message: {e}")
-                        await ws_manager.send_personal_message_json({"error": str(e)})
+                        await ws_manager.send_personal_message_json(
+                            {"error": str(e)}, websocket
+                        )
                 await asyncio.sleep(0.1)
 
             except WebSocketDisconnect:

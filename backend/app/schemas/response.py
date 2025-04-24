@@ -1,6 +1,5 @@
 from app.utils.enums import AgentType
 from pydantic import BaseModel
-from typing import Any
 
 
 class AgentMessage(BaseModel):
@@ -13,6 +12,8 @@ class CodeExecutionResult(BaseModel):
     msg: str
 
 
+# 1. 只带 code
+# 2. 只带 code result
 class CoderMessage(AgentMessage):
     agent_type: AgentType = AgentType.CODER
     code: str | None = None
