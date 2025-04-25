@@ -25,7 +25,7 @@
 - 📝 生成一份编排好格式的论文
 - 🤝 muti-agents: ~~建模手~~，代码手(反思模块，本地代码解释器)，论文手
 - 🔄 muti-llms: 每个agent设置不同的模型
-- 💰 成本低 agentless
+- 💰 成本低 agentless(单次任务成本约 1 rmb)
 
 ## 🚀 后期计划
 
@@ -40,6 +40,7 @@
 - [ ] docker 部署
 - [ ] 引入用户的交互（选择模型，重写等等）
 - [ ] codeinterpreter 接入云端 如 e2b 等供应商..
+- [ ] 多语言: R 语言, matlab
 
 clone 项目后，下载**Todo Tree**插件，可以查看代码中所有具体位置的 todo
 
@@ -60,7 +61,8 @@ uv sync # 安装依赖
 
 2. 配置模型
 
-复制`/config/config.toml.example`到`/config/config.toml`, 填写配置模型
+复制`/config/config.toml.example`到`/config/config.toml`, 填写配置模型和 APIKEY
+[deepseek开发者平台](https://platform.deepseek.com/)
 
 推荐模型能力较强的、参数量大的模型。
 
@@ -93,7 +95,10 @@ Thanks to the following projects:
 - [Latex](https://github.com/Veni222987/MathModelingLatexTemplate/tree/main)
 
 
-## 联系
+## 其他
+
+感谢赞助
+[danmo-tyc](https://github.com/danmo-tyc)
 
 有问题可以进群问
 
