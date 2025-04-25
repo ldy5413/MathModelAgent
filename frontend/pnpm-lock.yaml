@@ -20,6 +20,9 @@ importers:
       lucide-vue-next:
         specifier: ^0.475.0
         version: 0.475.0(vue@3.5.13(typescript@5.7.3))
+      marked:
+        specifier: ^15.0.11
+        version: 15.0.11
       md-editor-v3:
         specifier: ^5.4.1
         version: 5.4.1(vue@3.5.13(typescript@5.7.3))
@@ -1599,6 +1602,11 @@ packages:
 
   markdown-it@14.1.0:
     resolution: {integrity: sha512-a54IwgWPaeBCAAsv13YgmALOF1elABB08FxO9i+r4VFk5Vl4pKokRPeX8u5TCgSsPi6ec1otfLjdOpVcgbpshg==}
+    hasBin: true
+
+  marked@15.0.11:
+    resolution: {integrity: sha512-1BEXAU2euRCG3xwgLVT1y0xbJEld1XOrmRJpUwRCcy7rxhSCwMrmEu9LXoPhHSCJG41V7YcQ2mjKRr5BA3ITIA==}
+    engines: {node: '>= 18'}
     hasBin: true
 
   marked@4.3.0:
@@ -4326,6 +4334,8 @@ snapshots:
       mdurl: 2.0.0
       punycode.js: 2.3.1
       uc.micro: 2.1.0
+
+  marked@15.0.11: {}
 
   marked@4.3.0: {}
 

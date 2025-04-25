@@ -252,8 +252,8 @@ class E2BCodeInterpreter:
     async def cleanup(self):
         """清理资源并关闭沙箱"""
 
-        if await self.sbx.is_running():
-            logger.error("沙箱已经关闭了")
+        if not await self.sbx.is_running():
+            logger.warning("沙箱已经关闭了")
 
         try:
             if self.sbx:

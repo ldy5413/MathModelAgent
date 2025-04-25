@@ -11,10 +11,8 @@ import {
   useSidebar
 } from '@/components/ui/sidebar'
 import Files from '@/components/Files.vue'
+import NotebookArea from '@/components/NotebookArea.vue'
 
-
-import RenderJupyterNotebook from 'render-jupyter-notebook-vue'
-import example from '@/assets/jupyter.json'
 
 const isCollapsed = ref(false)
 
@@ -22,12 +20,6 @@ const isCollapsed = ref(false)
 const handleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
 }
-
-
-
-
-const notebook = ref(example)
-
 
 
 </script>
@@ -45,7 +37,7 @@ const notebook = ref(example)
           <SidebarTrigger class="-ml-1" @click="handleCollapse" />
         </header>
         <div class="flex-1 overflow-auto p-4">
-          <RenderJupyterNotebook :notebook="notebook" />
+          <NotebookArea></NotebookArea>
         </div>
       </SidebarInset>
     </div>

@@ -4,7 +4,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
-import Bubble from '@/components/Bubble.vue'
 import {
   Tabs,
   TabsContent,
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/card'
 import CoderEditor from '@/components/CoderEditor.vue'
 import WriterEditor from '@/components/WriterEditor.vue'
+import ChatArea from '@/components/ChatArea.vue'
 import { onMounted, ref, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
@@ -34,7 +34,6 @@ const initWebSocket = () => {
   const baseUrl = import.meta.env.VITE_WS_URL
   const wsUrl = `${baseUrl}/task/${props.task_id}`
   console.log('wsUrl', wsUrl)
-
 
   // 关闭现有连接
   if (socket.value) {
@@ -59,10 +58,8 @@ const initWebSocket = () => {
 
   socket.value.onerror = (error) => {
     console.error('WebSocket 错误:', error)
-    console.error('WebSocket 错误详情:', error.message)
   }
 }
-
 
 onMounted(() => {
   initWebSocket()
@@ -78,17 +75,7 @@ onBeforeUnmount(() => {
 <template>
   <ResizablePanelGroup direction="horizontal" class="h-screen rounded-lg border">
     <ResizablePanel :default-size="25" class="h-screen">
-      <div class="flex h-full flex-col p-4">
-        <div class="flex-1 space-y-4 overflow-y-auto">
-          <Bubble type="user">
-            请帮我分析这份数据
-          </Bubble>
-          <Bubble type="ai">
-            好的，我来帮你分析这些数据。首先，让我们看看数据的基本统计信息...
-          </Bubble>
-          <!-- 更多消息... -->
-        </div>
-      </div>
+      <ChatArea />
     </ResizablePanel>
     <ResizableHandle with-handle />
     <ResizablePanel :default-size="75" class="h-screen">
@@ -113,9 +100,9 @@ onBeforeUnmount(() => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="writer" class="flex-1 p-1">
-            <Card>
-              <CardContent class="p-2">
+          <TabsContent value="writer" class="flex-1 p-1 h-full overflow-hidden">
+            <Card class="h-full">
+              <CardContent class="p-2 h-full">
                 <WriterEditor />
               </CardContent>
             </Card>
