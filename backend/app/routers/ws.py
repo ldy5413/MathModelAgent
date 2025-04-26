@@ -1,9 +1,9 @@
 from fastapi import WebSocket, WebSocketDisconnect, APIRouter
 from app.utils.redis_manager import redis_manager
-from app.schemas.response import AgentMessage, AgentType
+from app.schemas.response import AgentMessage, AgentType, SystemMessage
 import asyncio
 from app.utils.ws_manager import ws_manager
-
+import json
 
 router = APIRouter()
 
@@ -28,10 +28,9 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
     pubsub = await redis_manager.subscribe_to_task(task_id)
     print(f"Subscribed to Redis channel: task:{task_id}:messages")
 
-    # 修改这里，使用异步的 redis_async_client
     await redis_manager.publish_message(
         task_id,
-        AgentMessage(agent_type=AgentType.SYSTEM, content="任务开始处理aaa"),
+        SystemMessage(content="任务开始处理aaa"),
     )
 
     try:
@@ -41,11 +40,9 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
                 if msg:
                     print(f"Received message: {msg}")
                     try:
-                        agent_msg = msg["data"]
-                        await ws_manager.send_personal_message_json(
-                            agent_msg, websocket
-                        )
-                        print(f"Sent message to WebSocket: {agent_msg}")
+                        msg_dict = json.loads(msg["data"])
+                        await ws_manager.send_personal_message_json(msg_dict, websocket)
+                        print(f"Sent message to WebSocket: {msg_dict}")
                     except Exception as e:
                         print(f"Error parsing message: {e}")
                         await ws_manager.send_personal_message_json(

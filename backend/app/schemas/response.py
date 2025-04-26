@@ -1,10 +1,23 @@
+from typing import Literal
 from app.utils.enums import AgentType
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from uuid import uuid4
 
 
-class AgentMessage(BaseModel):
-    agent_type: AgentType
+class Message(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    msg_type: Literal["system", "agent"] | None  # system msg | agent messsage
     content: str | None = None
+
+
+class SystemMessage(Message):
+    msg_type: str = "system"
+    type: Literal["info", "warning", "success", "error"] = "info"
+
+
+class AgentMessage(Message):
+    msg_type: str = "agent"
+    agent_type: AgentType  # Coder | Writer
 
 
 class CodeExecutionResult(BaseModel):

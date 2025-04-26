@@ -15,6 +15,8 @@ async def lifespan(app: FastAPI):
     PROJECT_FOLDER = "./project"
     os.makedirs(PROJECT_FOLDER, exist_ok=True)
 
+    logger.info("CORS_ALLOW_ORIGINS:", settings.CORS_ALLOW_ORIGINS)
+
     yield
     logger.info("Stopping MathModelAgent")
 

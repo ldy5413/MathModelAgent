@@ -10,10 +10,9 @@ export function submitModelingTask(
 	files?: File[],
 ) {
 	const formData = new FormData();
-
 	// 添加问题数据
 	formData.append("ques_all", problem.ques_all);
-	formData.append("comp_template", problem.comp_template || "国赛");
+	formData.append("comp_template", 'CHINA');
 	formData.append("format_output", problem.format_output || "Markdown");
 
 	if (files) {

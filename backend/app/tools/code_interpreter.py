@@ -1,7 +1,7 @@
 import os
 import re
 from e2b_code_interpreter import AsyncSandbox
-from app.schemas.response import CodeExecutionResult, CoderMessage
+from app.schemas.response import CodeExecutionResult, CoderMessage, SystemMessage
 from app.utils.enums import AgentType
 from app.utils.redis_manager import redis_manager
 from app.utils.notebook_serializer import NotebookSerializer
@@ -114,6 +114,7 @@ class E2BCodeInterpreter:
 
     async def execute_code(self, code: str) -> tuple[str, bool, str]:
         """执行代码并返回结果"""
+
         if not self.sbx:
             raise RuntimeError("沙箱环境未初始化")
 
@@ -125,10 +126,19 @@ class E2BCodeInterpreter:
         error_occurred: bool = False
         error_message: str = ""
 
+        await redis_manager.publish_message(
+            self.task_id,
+            SystemMessage(content="开始执行代码"),
+        )
         # 执行 Python 代码
         logger.info("开始在沙箱中执行代码...")
         execution = await self.sbx.run_code(code)  # 返回 Execution 对象
         logger.info("代码执行完成，开始处理结果...")
+
+        await redis_manager.publish_message(
+            self.task_id,
+            SystemMessage(content="代码执行完成"),
+        )
 
         # 处理执行错误
         if execution.error:
@@ -210,7 +220,7 @@ class E2BCodeInterpreter:
         )
         logger.debug(f"发送消息: {agent_msg.model_dump_json()}")
         await redis_manager.publish_message(
-            f"task:{self.task_id}:messages",
+            self.task_id,
             agent_msg,
         )
 

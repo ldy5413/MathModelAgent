@@ -15,15 +15,19 @@ from app.utils.log_util import logger
 from app.config.setting import settings
 from app.tools.code_interpreter import E2BCodeInterpreter
 from app.utils.common_utils import get_current_files
+from app.utils.redis_manager import redis_manager
+from app.schemas.response import SystemMessage
 
 
 class Agent:
     def __init__(
         self,
+        task_id: str,
         model: LLM,
         max_chat_turns: int = 30,  # 单个agent最大对话轮次
         user_output: UserOutput = None,
     ) -> None:
+        self.task_id = task_id
         self.model = model
         self.chat_history: list[dict] = []  # 存储对话历史
         self.max_chat_turns = max_chat_turns  # 最大对话轮次
@@ -82,13 +86,14 @@ class ModelerAgent(Agent):  # 继承自Agent类而不是BaseModel
 class CoderAgent(Agent):  # 同样继承自Agent类
     def __init__(
         self,
+        task_id: str,
         model: LLM,
         work_dir: str,  # 工作目录
         max_chat_turns: int = settings.MAX_CHAT_TURNS,  # 最大聊天次数
         max_retries: int = settings.MAX_RETRIES,  # 最大反思次数
         code_interpreter: E2BCodeInterpreter = None,
     ) -> None:
-        super().__init__(model, max_chat_turns)
+        super().__init__(task_id, model, max_chat_turns)
         self.work_dir = work_dir
         self.max_retries = max_retries
         self.is_first_run = True
@@ -118,11 +123,19 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         task_completed = False
 
         if self.current_chat_turns >= self.max_chat_turns:
+            await redis_manager.publish_message(
+                self.task_id,
+                SystemMessage(content="超过最大思考次数", type="error"),
+            )
             raise Exception(
                 f"Reached maximum number of chat turns ({self.max_chat_turns}). Task incomplete."
             )
 
         if retry_count >= self.max_retries:
+            await redis_manager.publish_message(
+                self.task_id,
+                SystemMessage(content="超过最大尝试次数", type="error"),
+            )
             raise Exception(
                 f"Failed to complete task after {self.max_retries} attempts. Last error: {last_error_message}"
             )
@@ -149,6 +162,12 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                 tool_id = tool_call.id
                 # TODO: json JSON解析时遇到了无效的转义字符
                 if tool_call.function.name == "execute_code":
+                    await redis_manager.publish_message(
+                        self.task_id,
+                        SystemMessage(
+                            content=f"代码手调用{tool_call.function.name}工具"
+                        ),
+                    )
                     code = json.loads(tool_call.function.arguments)["code"]
                     full_content = response.choices[0].message.content
                     # 更新对话历史 - 添加助手的响应
@@ -191,6 +210,11 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                         retry_count += 1
                         last_error_message = error_message
                         reflection_prompt = get_reflection_prompt(error_message, code)
+
+                        await redis_manager.publish_message(
+                            self.task_id,
+                            SystemMessage(content="代码手反思错误", type="error"),
+                        )
 
                         self.append_chat_history(
                             {"role": "user", "content": reflection_prompt}
@@ -241,13 +265,14 @@ class CoderAgent(Agent):  # 同样继承自Agent类
 class WriterAgent(Agent):  # 同样继承自Agent类
     def __init__(
         self,
+        task_id: str,
         model: LLM,
         max_chat_turns: int = 10,  # 添加最大对话轮次限制
         comp_template: CompTemplate = CompTemplate,
         format_output: FormatOutPut = FormatOutPut.Markdown,
         user_output: UserOutput = None,
     ) -> None:
-        super().__init__(model, max_chat_turns, user_output)
+        super().__init__(task_id, model, max_chat_turns, user_output)
         self.format_out_put = format_output
         self.comp_template = comp_template
         self.system_prompt = get_writer_prompt(format_output)

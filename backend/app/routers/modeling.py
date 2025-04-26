@@ -5,7 +5,7 @@ from app.utils.enums import CompTemplate, FormatOutPut
 from app.utils.log_util import logger
 from app.utils.redis_manager import redis_manager
 from app.schemas.request import Problem
-from app.schemas.response import AgentMessage, AgentType
+from app.schemas.response import AgentMessage, AgentType, Message, SystemMessage
 from app.utils.common_utils import create_task_id, create_work_dir
 import os
 import asyncio
@@ -100,8 +100,8 @@ async def run_modeling_task_async(
 
     # 发送任务开始状态
     await redis_manager.publish_message(
-        f"task:{problem.task_id}:messages",
-        AgentMessage(agent_type=AgentType.SYSTEM, content="任务开始处理"),
+        task_id,
+        SystemMessage(content="任务开始处理"),
     )
 
     # 给一个短暂的延迟，确保 WebSocket 有机会连接
@@ -112,14 +112,8 @@ async def run_modeling_task_async(
     # 设置超时时间（比如 30 分钟）
     await asyncio.wait_for(task, timeout=1800)
 
-    # 在关键步骤发送状态更新
-    await redis_manager.publish_message(
-        problem.task_id,
-        AgentMessage(agent_type=AgentType.SYSTEM, content="开始执行建模任务"),
-    )
-
     # 发送任务完成状态
     await redis_manager.publish_message(
-        f"task:{problem.task_id}:messages",
-        AgentMessage(agent_type=AgentType.SYSTEM, content="任务处理完成"),
+        task_id,
+        SystemMessage(content="任务处理完成", type="success"),
     )

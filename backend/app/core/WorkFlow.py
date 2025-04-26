@@ -2,6 +2,7 @@ from app.core.agents import WriterAgent, CoderAgent
 from app.core.llm import LLM
 from app.models.model import CoderToWriter
 from app.schemas.request import Problem
+from app.schemas.response import SystemMessage
 from app.utils.log_util import logger
 from app.utils.common_utils import create_work_dir, simple_chat, get_config_template
 from app.models.user_output import UserOutput
@@ -9,7 +10,7 @@ from app.config.setting import settings
 from app.core.llm import DeepSeekModel
 from app.tools.code_interpreter import E2BCodeInterpreter
 import json
-
+from app.utils.redis_manager import redis_manager
 from app.utils.notebook_serializer import NotebookSerializer
 
 
@@ -41,11 +42,21 @@ class MathModelWorkFlow(WorkFlow):
             task_id=self.task_id,
         )
 
+        await redis_manager.publish_message(
+            self.task_id,
+            SystemMessage(content="正在拆解问题问题"),
+        )
+
         self.format_questions(problem.ques_all, deepseek_model)
 
         user_output = UserOutput(work_dir=self.work_dir)
 
         notebook_serializer = NotebookSerializer(work_dir=self.work_dir)
+
+        await redis_manager.publish_message(
+            self.task_id,
+            SystemMessage(content="正在创建代码沙盒环境"),
+        )
 
         e2b_code_interpreter = await E2BCodeInterpreter.create(
             workd_dir=self.work_dir,
@@ -54,7 +65,18 @@ class MathModelWorkFlow(WorkFlow):
             timeout=3000,
         )
 
+        await redis_manager.publish_message(
+            self.task_id,
+            SystemMessage(content="创建完成"),
+        )
+
+        await redis_manager.publish_message(
+            self.task_id,
+            SystemMessage(content="初始化代码手"),
+        )
+
         coder_agent = CoderAgent(
+            task_id=problem.task_id,
             model=deepseek_model,
             work_dir=self.work_dir,
             max_chat_turns=settings.MAX_CHAT_TURNS,
@@ -68,26 +90,51 @@ class MathModelWorkFlow(WorkFlow):
         config_template = get_config_template(problem.comp_template)
 
         for key, value in solution_steps.items():
+            await redis_manager.publish_message(
+                self.task_id,
+                SystemMessage(content=f"代码手开始求解{key}"),
+            )
+
             coder_response = await coder_agent.run(
                 prompt=value["coder_prompt"], subtask_title=key
+            )
+
+            await redis_manager.publish_message(
+                self.task_id,
+                SystemMessage(content=f"代码手求解成功{key}", type="success"),
             )
 
             # TODO: 是否可以不需要coder_response
             writer_prompt = self.get_writer_prompt(
                 key, coder_response, e2b_code_interpreter, config_template
             )
+
+            await redis_manager.publish_message(
+                self.task_id,
+                SystemMessage(content=f"论文手开始写{key}部分"),
+            )
+
             # TODO: 自定义 writer_agent mode llm
             writer_agent = WriterAgent(
+                task_id=problem.task_id,
                 model=deepseek_model,
                 comp_template=problem.comp_template,
                 format_output=problem.format_output,
             )
 
+            ## TODO: 图片引用错误
             writer_response = await writer_agent.run(
                 writer_prompt,
                 available_images=await e2b_code_interpreter.get_created_images(key),
             )
+
+            await redis_manager.publish_message(
+                self.task_id,
+                SystemMessage(content=f"论文手完成{key}部分"),
+            )
+
             user_output.set_res(key, writer_response)
+
         # 关闭沙盒
 
         await e2b_code_interpreter.shutdown_sandbox()
@@ -97,8 +144,14 @@ class MathModelWorkFlow(WorkFlow):
 
         flows = self.get_write_flows(user_output, config_template, problem.ques_all)
         for key, value in flows.items():
+            await redis_manager.publish_message(
+                self.task_id,
+                SystemMessage(content=f"论文手开始写{key}部分"),
+            )
+
             # TODO: writer_agent 是否不需要初始化
             writer_agent = WriterAgent(
+                task_id=problem.task_id,
                 model=deepseek_model,
                 comp_template=problem.comp_template,
                 format_output=problem.format_output,

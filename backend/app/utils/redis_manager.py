@@ -1,7 +1,7 @@
 import redis.asyncio as aioredis
 from typing import Optional
 from app.config.setting import settings
-from app.schemas.response import AgentMessage
+from app.schemas.response import AgentMessage, Message
 from app.utils.log_util import logger
 
 
@@ -26,7 +26,7 @@ class RedisManager:
         await client.set(key, value)
         await client.expire(key, 36000)
 
-    async def publish_message(self, task_id: str, message: AgentMessage):
+    async def publish_message(self, task_id: str, message: Message):
         """发布消息到特定任务的频道"""
         client = await self.get_client()
         channel = f"task:{task_id}:messages"

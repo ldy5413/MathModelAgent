@@ -4,7 +4,7 @@ import os
 from typing import Annotated
 
 
-def parse_cors(value: str) -> list[AnyUrl]:
+def parse_cors(value: str) -> list[str]:
     """
     Parses the CORS settings from a string to a list of URLs.
     """
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     DEBUG: bool
     REDIS_URL: str
     REDIS_MAX_CONNECTIONS: int
-    CORS_ALLOW_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)]
+    CORS_ALLOW_ORIGINS: Annotated[list[str] | str, BeforeValidator(parse_cors)]
 
     model_config = SettingsConfigDict(env_file=".env.dev", env_file_encoding="utf-8")
 
