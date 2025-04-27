@@ -20,6 +20,7 @@ import ChatArea from '@/components/ChatArea.vue'
 import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
 import { TaskWebSocket } from '@/utils/websocket'
 import type { Message, CoderMessage, WriterMessage } from '@/utils/response'
+import messageData from '@/pages/test/message.json'
 
 const props = defineProps<{ task_id: string }>()
 const messages = ref<Message[]>([])
@@ -38,6 +39,10 @@ onMounted(() => {
     messages.value.push(data)
   })
   ws.connect()
+
+  // TODO: 测试模式下加载
+  // 本地加载 message.json
+  messages.value = messageData as Message[]
 })
 
 onBeforeUnmount(() => {
@@ -52,12 +57,12 @@ onBeforeUnmount(() => {
 const chatMessages = computed(() =>
   messages.value.filter(
     (msg) => {
-      if (msg.msg_type === 'agent' && msg.agent_type === 'CoderAgent' && msg.code_result) {
+      if (msg.msg_type === 'agent' && msg.agent_type === 'CoderAgent' && msg.content == null) {
         // 有 code_result 的 CoderAgent 消息不显示
         return false
       }
       // 其他 agent 或 system 消息正常显示
-      return msg.msg_type === 'agent' || msg.msg_type === 'system'
+      return msg.msg_type === 'agent' && msg.content || msg.msg_type === 'system'
     }
   )
 )
@@ -81,6 +86,16 @@ const writerMessages = computed(() =>
       msg.msg_type === 'agent' && msg.agent_type === 'WriterAgent'
   )
 )
+
+function downloadMessages() {
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(messages.value, null, 2))
+  const downloadAnchorNode = document.createElement('a')
+  downloadAnchorNode.setAttribute("href", dataStr)
+  downloadAnchorNode.setAttribute("download", "message.json")
+  document.body.appendChild(downloadAnchorNode)
+  downloadAnchorNode.click()
+  downloadAnchorNode.remove()
+}
 
 </script>
 
@@ -123,4 +138,7 @@ const writerMessages = computed(() =>
       </div>
     </ResizablePanel>
   </ResizablePanelGroup>
+  <button @click="downloadMessages" class="absolute top-2 right-2 z-10 bg-blue-500 text-white px-3 py-1 rounded">
+    下载消息
+  </button>
 </template>
