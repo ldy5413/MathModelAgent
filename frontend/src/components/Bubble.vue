@@ -27,7 +27,7 @@ const renderedContent = computed(() => {
     props.type === 'agent' && props.agentType === 'CoderAgent' ? 'bubble-coder' : '',
     props.type === 'agent' && props.agentType === 'WriterAgent' ? 'bubble-writer' : '',
     props.class
-  ]">
+  ]" style="display: flex;">
     <div class="flex flex-col items-center gap-1">
       <!-- 头像在上方 -->
       <span v-if="props.type === 'user'" class="text-2xl select-none mb-1">🧑</span>
@@ -151,17 +151,13 @@ const renderedContent = computed(() => {
 
 .bubble-user {
   justify-content: flex-end;
-  /* 用户气泡靠右 */
+  /* 用户气泡整体靠右 */
 }
 
-.bubble-coder {
-  justify-content: flex-start;
-  /* CoderAgent 气泡靠左 */
-}
-
+.bubble-coder,
 .bubble-writer {
   justify-content: flex-start;
-  /* WriterAgent 气泡靠左 */
+  /* Agent 气泡整体靠左 */
 }
 
 /* 用户气泡颜色 */

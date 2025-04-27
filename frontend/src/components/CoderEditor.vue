@@ -29,14 +29,14 @@ const handleCollapse = () => {
         'transition-all duration-300 overflow-hidden',
         isCollapsed ? 'w-0' : 'w-64'
       ]">
-        <Files class="w-64 border-r h-full" />
+        <Files class="w-55 border-r h-full" />
       </div>
-      <SidebarInset class="flex-1 flex flex-col">
+      <SidebarInset class="flex-1 flex flex-col min-h-0 min-w-0">
         <header class="flex h-10 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger class="-ml-1" @click="handleCollapse" />
         </header>
-        <div class="flex-1 overflow-auto p-4">
-          <NotebookArea></NotebookArea>
+        <div class="flex-1 min-h-0 min-w-0 overflow-auto">
+          <NotebookArea class="h-full min-w-0" />
         </div>
       </SidebarInset>
     </div>

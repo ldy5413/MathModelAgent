@@ -86,12 +86,12 @@ const writerMessages = computed(() =>
 
 <template>
   <ResizablePanelGroup direction="horizontal" class="h-screen rounded-lg border">
-    <ResizablePanel :default-size="25" class="h-screen">
+    <ResizablePanel :default-size="30" class="h-screen">
       <ChatArea :messages="chatMessages" />
     </ResizablePanel>
     <ResizableHandle />
-    <ResizablePanel :default-size="75" class="h-screen">
-      <div class="flex h-full flex-col">
+    <ResizablePanel :default-size="70" class="h-screen min-w-0">
+      <div class="flex h-full flex-col min-w-0">
         <Tabs default-value="coder" class="w-full h-full">
           <div class="border-b px-4 py-1">
             <TabsList class="justify-center">
@@ -104,10 +104,10 @@ const writerMessages = computed(() =>
             </TabsList>
           </div>
 
-          <TabsContent value="coder" class="flex-1 p-1">
-            <Card>
-              <CardContent class="p-2">
-                <CoderEditor />
+          <TabsContent value="coder" class="flex-1 p-1 min-w-0">
+            <Card class="h-full min-w-0">
+              <CardContent class="p-2 h-full min-w-0">
+                <CoderEditor class="h-full min-w-0" />
               </CardContent>
             </Card>
           </TabsContent>
