@@ -94,9 +94,9 @@ onMounted(async () => {
 
 
 <template>
-  <div class="flex-1 bg-gray-50">
+  <div class="flex-1 px-1 pt-1 bg-gray-50">
     <!-- 遍历所有单元格 -->
-    <div v-for="(cell, index) in cells" :key="index" class="transform transition-all duration-200 hover:shadow-lg">
+    <div v-for="(cell, index) in cells" :key="index" class="transform transition-all duration-200 hover:shadow-lg py-1">
       <div :class="[
         'bg-white rounded-lg shadow-sm overflow-hidden',
         'border border-gray-200 hover:border-blue-300',
@@ -104,7 +104,7 @@ onMounted(async () => {
       ]">
         <!-- 单元格头部 -->
         <div
-          class="px-4 py-2 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+          class="px-3 py-1 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
           <div class="flex items-center space-x-2">
             <span :class="[
               'px-2 py-1 rounded text-xs font-medium',

@@ -24,12 +24,12 @@ const handleCollapse = () => {
 </script>
 <template>
   <SidebarProvider :collapsed="isCollapsed">
-    <div class="flex h-screen">
+    <div class="flex h-full min-h-0 w-full min-w-0">
       <div :class="[
         'transition-all duration-300 overflow-hidden',
-        isCollapsed ? 'w-0' : 'w-64'
+        isCollapsed ? 'w-0' : 'w-44'
       ]">
-        <Files class="w-55 border-r h-full" />
+        <Files class="w-44 border-r h-full" />
       </div>
       <SidebarInset class="flex-1 flex flex-col min-h-0 min-w-0">
         <header class="flex h-10 shrink-0 items-center gap-2 border-b px-4">

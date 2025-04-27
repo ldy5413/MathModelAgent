@@ -104,7 +104,7 @@ const writerMessages = computed(() =>
             </TabsList>
           </div>
 
-          <TabsContent value="coder" class="flex-1 p-1 min-w-0">
+          <TabsContent value="coder" class="flex-1 p-1 min-w-0 h-full">
             <Card class="h-full min-w-0">
               <CardContent class="p-2 h-full min-w-0">
                 <CoderEditor class="h-full min-w-0" />
