@@ -17,11 +17,11 @@ class SystemMessage(Message):
 
 class AgentMessage(Message):
     msg_type: str = "agent"
-    agent_type: AgentType  # Coder | Writer
+    agent_type: AgentType  # CoderAgent | WriterAgent
 
 
 class CodeExecutionResult(BaseModel):
-    msg_type: str
+    res_type: str
     msg: str
 
 

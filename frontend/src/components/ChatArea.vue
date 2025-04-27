@@ -1,75 +1,22 @@
 <script setup lang="ts">
 import Bubble from './Bubble.vue'
 import SystemMessage from './SystemMessage.vue'
-import { ref, nextTick } from 'vue'
+import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Send } from 'lucide-vue-next'
+import type { Message } from '@/utils/response'
 
-interface Message {
-  id: number
-  type: 'user' | 'ai' | 'system'
-  content: string
-  systemType?: 'info' | 'warning' | 'success' | 'error'
-}
-
-const messages = ref<Message[]>([
-  {
-    id: 1,
-    type: 'user',
-    content: '请帮我分析这份数据'
-  },
-  {
-    id: 2,
-    type: 'system',
-    content: '正在处理数据分析请求...',
-    systemType: 'info'
-  },
-  {
-    id: 3,
-    type: 'ai',
-    content: `好的，我来帮你分析这些数据。首先，让我们看看数据的基本统计信息：
-
-1. 数据概览
-   - 样本数量
-   - 数值范围
-   - 分布特征
-
-2. 关键指标
-   - 均值
-   - 中位数
-   - 标准差
-
-接下来我们可以深入分析...`
-  },
-  {
-    id: 4,
-    type: 'system',
-    content: '数据分析完成',
-    systemType: 'success'
-  }
-])
+const props = defineProps<{ messages: Message[] }>()
 
 const inputValue = ref('')
 const inputRef = ref<HTMLInputElement | null>(null)
 const scrollRef = ref<HTMLDivElement | null>(null)
 
-// 添加新消息的方法
-const addMessage = (message: Omit<Message, 'id'>) => {
-  messages.value.push({
-    ...message,
-    id: messages.value.length + 1
-  })
-  nextTick(() => {
-    if (scrollRef.value) {
-      scrollRef.value.scrollTop = scrollRef.value.scrollHeight
-    }
-  })
-}
-
 const sendMessage = () => {
+  // 这里只处理本地 user 消息输入，如需和后端交互请在父组件处理
   if (!inputValue.value.trim()) return
-  addMessage({ type: 'user', content: inputValue.value })
+  // 可以通过 emit 事件让父组件处理 user 消息
   inputValue.value = ''
   inputRef.value?.focus()
 }
@@ -78,11 +25,16 @@ const sendMessage = () => {
 <template>
   <div class="flex h-full flex-col p-4">
     <div ref="scrollRef" class="flex-1 overflow-y-auto">
-      <template v-for="message in messages" :key="message.id">
+      <template v-for="message in props.messages" :key="message.id">
         <div class="mb-3">
-          <Bubble v-if="message.type === 'user' || message.type === 'ai'" :type="message.type"
-            :content="message.content" />
-          <SystemMessage v-else :content="message.content" :type="message.systemType" />
+          <!-- 用户消息 -->
+          <Bubble v-if="message.msg_type === 'user'" type="user" :content="message.content || ''" />
+          <!-- agent 消息（CoderAgent/WriterAgent，只显示 content） -->
+          <Bubble v-else-if="message.msg_type === 'agent'" type="agent" :agentType="message.agent_type"
+            :content="message.content || ''" />
+          <!-- 系统消息 -->
+          <SystemMessage v-else-if="message.msg_type === 'system'" :content="message.content || ''"
+            :type="message.type" />
         </div>
       </template>
     </div>

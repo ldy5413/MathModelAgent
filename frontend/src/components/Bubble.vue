@@ -5,7 +5,8 @@ import { marked } from 'marked'
 import { computed } from 'vue'
 
 interface BubbleProps {
-  type: 'ai' | 'user'
+  type: 'agent' | 'user'
+  agentType?: 'CoderAgent' | 'WriterAgent'
   class?: HTMLAttributes['class']
   content: string
 }
@@ -20,19 +21,30 @@ const renderedContent = computed(() => {
 </script>
 
 <template>
-  <div :class="cn(
-    'flex w-full',
-    props.type === 'user' ? 'justify-end' : 'justify-start',
+  <div :class="[
+    'bubble',
+    props.type === 'user' ? 'bubble-user' : '',
+    props.type === 'agent' && props.agentType === 'CoderAgent' ? 'bubble-coder' : '',
+    props.type === 'agent' && props.agentType === 'WriterAgent' ? 'bubble-writer' : '',
     props.class
-  )">
-    <div :class="cn(
-      'max-w-[80%] rounded-2xl px-4 py-2 text-sm',
-      props.type === 'user'
-        ? 'bg-primary text-primary-foreground prose-invert'
-        : 'bg-muted text-foreground',
-      'prose prose-sm prose-slate max-w-none'
-    )">
-      <div v-html="renderedContent"></div>
+  ]">
+    <div class="flex flex-col items-center gap-1">
+      <!-- 头像在上方 -->
+      <span v-if="props.type === 'user'" class="text-2xl select-none mb-1">🧑</span>
+      <span v-else-if="props.type === 'agent' && props.agentType === 'CoderAgent'"
+        class="text-2xl select-none mb-1">👨‍💻</span>
+      <span v-else-if="props.type === 'agent' && props.agentType === 'WriterAgent'"
+        class="text-2xl select-none mb-1">✍️</span>
+      <!-- 气泡内容在下方 -->
+      <div :class="cn(
+        'max-w-[80%] rounded-2xl px-4 py-2 text-sm',
+        props.type === 'user'
+          ? 'bg-primary text-primary-foreground prose-invert'
+          : 'bg-muted text-foreground',
+        'prose prose-sm prose-slate max-w-none'
+      )">
+        <div v-html="renderedContent"></div>
+      </div>
     </div>
   </div>
 </template>
@@ -135,5 +147,47 @@ const renderedContent = computed(() => {
 .prose thead *,
 .prose td * {
   @apply opacity-100;
+}
+
+.bubble-user {
+  justify-content: flex-end;
+  /* 用户气泡靠右 */
+}
+
+.bubble-coder {
+  justify-content: flex-start;
+  /* CoderAgent 气泡靠左 */
+}
+
+.bubble-writer {
+  justify-content: flex-start;
+  /* WriterAgent 气泡靠左 */
+}
+
+/* 用户气泡颜色 */
+.bubble-user .prose {
+  background: #2563eb;
+  /* 蓝色 */
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  border: 1px solid #2563eb;
+}
+
+/* CoderAgent 气泡颜色 */
+.bubble-coder .prose {
+  background: #f1f5f9;
+  /* 浅灰 */
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
+  border: 1px solid #38bdf8;
+}
+
+/* WriterAgent 气泡颜色 */
+.bubble-writer .prose {
+  background: #fef9c3;
+  /* 浅黄 */
+  color: #92400e;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.08);
+  border: 1px solid #facc15;
 }
 </style>

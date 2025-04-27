@@ -30,7 +30,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
     await redis_manager.publish_message(
         task_id,
-        SystemMessage(content="任务开始处理aaa"),
+        SystemMessage(content="任务开始处理"),
     )
 
     try:

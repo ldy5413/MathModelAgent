@@ -17,67 +17,79 @@ import {
 import CoderEditor from '@/components/CoderEditor.vue'
 import WriterEditor from '@/components/WriterEditor.vue'
 import ChatArea from '@/components/ChatArea.vue'
-import { onMounted, ref, onBeforeUnmount } from 'vue'
+import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
+import { TaskWebSocket } from '@/utils/websocket'
+import type { Message, CoderMessage, WriterMessage } from '@/utils/response'
 
-const props = defineProps({
-  task_id: {
-    type: String,
-    required: true
-  }
-})
+const props = defineProps<{ task_id: string }>()
+const messages = ref<Message[]>([])
 
 console.log('Task ID:', props.task_id) // 输出 
 
-const socket = ref<WebSocket | null>(null)
-
-const initWebSocket = () => {
-  const baseUrl = import.meta.env.VITE_WS_URL
-  const wsUrl = `${baseUrl}/task/${props.task_id}`
-  console.log('wsUrl', wsUrl)
-
-  // 关闭现有连接
-  if (socket.value) {
-    socket.value.close()
-  }
-
-  socket.value = new WebSocket(wsUrl)
-  console.log('WebSocket 对象已创建:', socket.value)
-
-  socket.value.onopen = () => {
-    console.log('WebSocket 连接已建立')
-  }
-
-  socket.value.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    console.log('收到消息:', data)
-  }
-
-  socket.value.onclose = (event) => {
-    console.log('WebSocket 连接已关闭', event.code, event.reason)
-  }
-
-  socket.value.onerror = (error) => {
-    console.error('WebSocket 错误:', error)
-  }
-}
+let ws: TaskWebSocket | null = null
 
 onMounted(() => {
-  initWebSocket()
+  const baseUrl = import.meta.env.VITE_WS_URL
+  const wsUrl = `${baseUrl}/task/${props.task_id}`
+
+  ws = new TaskWebSocket(wsUrl, (data) => {
+    console.log(data)
+    // 这里可以做类型转换 
+    messages.value.push(data)
+  })
+  ws.connect()
 })
 
 onBeforeUnmount(() => {
-  if (socket.value) {
-    socket.value.close()
-  }
+  ws?.close()
 })
+
+
+// CoderMessage 的 
+// content
+// 显示在 CoderEditor 里
+
+const chatMessages = computed(() =>
+  messages.value.filter(
+    (msg) => {
+      if (msg.msg_type === 'agent' && msg.agent_type === 'CoderAgent' && msg.code_result) {
+        // 有 code_result 的 CoderAgent 消息不显示
+        return false
+      }
+      // 其他 agent 或 system 消息正常显示
+      return msg.msg_type === 'agent' || msg.msg_type === 'system'
+    }
+  )
+)
+
+// CoderMessage 的 
+// code: str | None = None
+// code_result
+// 显示在 CoderEditor 里
+
+const coderMessages = computed(() =>
+  messages.value.filter(
+    (msg): msg is CoderMessage =>
+      msg.msg_type === 'agent' && msg.agent_type === 'CoderAgent'
+  )
+)
+
+
+const writerMessages = computed(() =>
+  messages.value.filter(
+    (msg): msg is WriterMessage =>
+      msg.msg_type === 'agent' && msg.agent_type === 'WriterAgent'
+  )
+)
+
 </script>
 
 <template>
   <ResizablePanelGroup direction="horizontal" class="h-screen rounded-lg border">
     <ResizablePanel :default-size="25" class="h-screen">
-      <ChatArea />
+      <ChatArea :messages="chatMessages" />
     </ResizablePanel>
-    <ResizableHandle with-handle />
+    <ResizableHandle />
     <ResizablePanel :default-size="75" class="h-screen">
       <div class="flex h-full flex-col">
         <Tabs default-value="coder" class="w-full h-full">

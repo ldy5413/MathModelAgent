@@ -8,7 +8,6 @@ import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-  useSidebar
 } from '@/components/ui/sidebar'
 import Files from '@/components/Files.vue'
 import NotebookArea from '@/components/NotebookArea.vue'

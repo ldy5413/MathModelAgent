@@ -206,12 +206,12 @@ class E2BCodeInterpreter:
             error_message,
         )
 
-    async def _push_to_websocket(self, msg_type, msg):
+    async def _push_to_websocket(self, res_type, msg):
         # 如果msg不是字符串，转为json字符串
         if not isinstance(msg, str):
             msg = json.dumps(msg, ensure_ascii=False)
         code_execution_result = CodeExecutionResult(
-            msg_type=msg_type,
+            res_type=res_type,
             msg=msg,
         )
         agent_msg = CoderMessage(

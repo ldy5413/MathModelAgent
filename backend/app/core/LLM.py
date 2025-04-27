@@ -74,17 +74,12 @@ class LLM:
             if tool_call.function.name == "execute_code":
                 code = json.loads(tool_call.function.arguments)["code"]
         await self.send_message(agent_name, completion.choices[0].message.content, code)
-        logger.debug(completion)
 
     async def send_message(self, agent_name, content, code=""):
         if agent_name == "CoderAgent":
-            agent_msg: CoderMessage = CoderMessage(
-                agent_type=AgentType.CODER, content=content, code=code
-            )
+            agent_msg: CoderMessage = CoderMessage(content=content, code=code)
         elif agent_name == "WriterAgent":
-            agent_msg: WriterMessage = WriterMessage(
-                agent_type=AgentType.WRITER, content=content
-            )
+            agent_msg: WriterMessage = WriterMessage(content=content)
         else:
             raise ValueError(f"无效的agent_name: {agent_name}")
 
