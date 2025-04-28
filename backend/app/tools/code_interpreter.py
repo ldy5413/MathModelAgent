@@ -1,7 +1,15 @@
 import os
 import re
 from e2b_code_interpreter import AsyncSandbox
-from app.schemas.response import CodeExecutionResult, CoderMessage, SystemMessage
+from app.schemas.response import (
+    CoderMessage,
+    ErrorModel,
+    OutputItem,
+    ResultModel,
+    StdErrModel,
+    StdOutModel,
+    SystemMessage,
+)
 from app.utils.enums import AgentType
 from app.utils.redis_manager import redis_manager
 from app.utils.notebook_serializer import NotebookSerializer
@@ -122,7 +130,7 @@ class E2BCodeInterpreter:
         self.notebook_serializer.add_code_cell_to_notebook(code)
 
         text_to_gpt: list[str] = []
-        content_to_display = []
+        content_to_display: list[OutputItem] | None = []
         error_occurred: bool = False
         error_message: str = ""
 
@@ -147,7 +155,13 @@ class E2BCodeInterpreter:
             error_message = self._truncate_text(error_message)
             logger.error(f"执行错误: {error_message}")
             text_to_gpt.append(delete_color_control_char(error_message))
-            content_to_display.append(("error", error_message))
+            content_to_display.append(
+                ErrorModel(
+                    name=execution.error.name,
+                    value=execution.error.value,
+                    traceback=execution.error.traceback,
+                )
+            )
         # 处理标准输出和标准错误
 
         if execution.logs:
@@ -156,7 +170,9 @@ class E2BCodeInterpreter:
                 stdout_str = self._truncate_text(stdout_str)
                 logger.info(f"标准输出: {stdout_str}")
                 text_to_gpt.append(stdout_str)
-                content_to_display.append(("text", stdout_str))
+                content_to_display.append(
+                    StdOutModel(msg="\n".join(execution.logs.stdout))
+                )
                 self.notebook_serializer.add_code_cell_output_to_notebook(stdout_str)
 
             if execution.logs.stderr:
@@ -164,40 +180,114 @@ class E2BCodeInterpreter:
                 stderr_str = self._truncate_text(stderr_str)
                 logger.warning(f"标准错误: {stderr_str}")
                 text_to_gpt.append(stderr_str)
-                content_to_display.append(("error", stderr_str))
+                content_to_display.append(
+                    StdErrModel(msg="\n".join(execution.logs.stderr))
+                )
 
             # 处理执行结果
         if execution.results:
             for result in execution.results:
-                # 处理主要结果
-                if result.is_main_result and result.text:
-                    result_text = self._truncate_text(result.text)
-                    logger.info(f"主要结果: {result_text}")
-                    text_to_gpt.append(result_text)
-                    content_to_display.append(("text", result_text))
-                    self.notebook_serializer.add_code_cell_output_to_notebook(
-                        result_text
+                # 1. 文本格式
+                if str(result):
+                    content_to_display.append(
+                        ResultModel(type="result", format="text", msg=str(result))
                     )
-
-                # 处理图表结果
-                if result.chart:
-                    logger.info("发现图表结果")
-                    chart_data = result.chart.to_dict()
-                    chart_str = str(chart_data)
-                    # if len(chart_str) > 1000:  # 限制图表数据大小
-                    #     chart_str = "图表数据过大，已省略"
-                    text_to_gpt.append(chart_str)
-                    content_to_display.append(("chart", chart_data))
-
-            # 保存到分段内容
-        for val in content_to_display:
-            self.add_section(val[0])
-            self.add_content(val[0], val[1])
-            await self._push_to_websocket(val[0], val[1])
-
-        logger.info("执行结果已推送到WebSocket")
+                # 2. HTML格式
+                if result._repr_html_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result", format="html", msg=result._repr_html_()
+                        )
+                    )
+                # 3. Markdown格式
+                if result._repr_markdown_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result",
+                            format="markdown",
+                            msg=result._repr_markdown_(),
+                        )
+                    )
+                # 4. PNG图片（base64字符串，前端可直接渲染）
+                if result._repr_png_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result", format="png", msg=result._repr_png_()
+                        )
+                    )
+                # 5. JPEG图片
+                if result._repr_jpeg_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result", format="jpeg", msg=result._repr_jpeg_()
+                        )
+                    )
+                # 6. SVG
+                if result._repr_svg_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result", format="svg", msg=result._repr_svg_()
+                        )
+                    )
+                # 7. PDF
+                if result._repr_pdf_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result", format="pdf", msg=result._repr_pdf_()
+                        )
+                    )
+                # 8. LaTeX
+                if result._repr_latex_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result", format="latex", msg=result._repr_latex_()
+                        )
+                    )
+                # 9. JSON
+                if result._repr_json_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result",
+                            format="json",
+                            msg=json.dumps(result._repr_json_()),
+                        )
+                    )
+                # 10. JavaScript
+                if result._repr_javascript_():
+                    content_to_display.append(
+                        ResultModel(
+                            type="result",
+                            format="javascript",
+                            msg=result._repr_javascript_(),
+                        )
+                    )
+                    # 处理主要结果
+                # if result.is_main_result and result.text:
+                #     result_text = self._truncate_text(result.text)
+                #     logger.info(f"主要结果: {result_text}")
+                #     text_to_gpt.append(result_text)
+                #     self.notebook_serializer.add_code_cell_output_to_notebook(
+                #         result_text
+                #     )
 
         # 限制返回的文本总长度
+
+        for item in content_to_display:
+            if isinstance(item, dict):
+                if item.get("type") in ["stdout", "stderr", "error"]:
+                    text_to_gpt.append(item.get("content") or item.get("value") or "")
+            elif isinstance(item, ResultModel):
+                if item.format in ["text", "html", "markdown", "json"]:
+                    text_to_gpt.append(f"[{item.format}]\n{item.msg}")
+                elif item.format in ["png", "jpeg", "svg", "pdf"]:
+                    text_to_gpt.append(
+                        f"[{item.format} 图片已生成，内容为 base64，未展示]"
+                    )
+
+        # 保存到分段内容
+        ## TODO: Base64 等图像需要优化
+        await self._push_to_websocket(content_to_display)
+
         combined_text = "\n".join(text_to_gpt)
 
         return (
@@ -206,17 +296,12 @@ class E2BCodeInterpreter:
             error_message,
         )
 
-    async def _push_to_websocket(self, res_type, msg):
-        # 如果msg不是字符串，转为json字符串
-        if not isinstance(msg, str):
-            msg = json.dumps(msg, ensure_ascii=False)
-        code_execution_result = CodeExecutionResult(
-            res_type=res_type,
-            msg=msg,
-        )
+    async def _push_to_websocket(self, content_to_display: list[OutputItem] | None):
+        logger.info("执行结果已推送到WebSocket")
+
         agent_msg = CoderMessage(
             agent_type=AgentType.CODER,
-            code_result=code_execution_result,
+            code_results=content_to_display,
         )
         logger.debug(f"发送消息: {agent_msg.model_dump_json()}")
         await redis_manager.publish_message(
