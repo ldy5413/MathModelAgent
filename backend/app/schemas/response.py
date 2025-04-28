@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import List, Literal, Union
 from app.utils.enums import AgentType
 from pydantic import BaseModel, Field
 from uuid import uuid4
@@ -20,9 +20,44 @@ class AgentMessage(Message):
     agent_type: AgentType  # CoderAgent | WriterAgent
 
 
-class CodeExecutionResult(BaseModel):
-    res_type: str
-    msg: str
+class CodeExecution(BaseModel):
+    res_type: Literal["stdout", "stderr", "result", "error"]
+    msg: str | None = None
+
+
+class StdOutModel(CodeExecution):
+    res_type: str = "stdout"
+
+
+class StdErrModel(CodeExecution):
+    res_type: str = "stderr"
+
+
+class ResultModel(CodeExecution):
+    res_type: str = "result"
+    format: Literal[
+        "text",
+        "html",
+        "markdown",
+        "png",
+        "jpeg",
+        "svg",
+        "pdf",
+        "latex",
+        "json",
+        "javascript",
+    ]
+
+
+class ErrorModel(CodeExecution):
+    res_type: str = "error"
+    name: str
+    value: str
+    traceback: str
+
+
+# 总返回类型
+OutputItem = Union[StdOutModel, StdErrModel, ResultModel, ErrorModel]
 
 
 # 1. 只带 code
@@ -30,7 +65,7 @@ class CodeExecutionResult(BaseModel):
 class CoderMessage(AgentMessage):
     agent_type: AgentType = AgentType.CODER
     code: str | None = None
-    code_result: CodeExecutionResult | None = None
+    code_results: list[OutputItem] | None = None
 
 
 class WriterMessage(AgentMessage):

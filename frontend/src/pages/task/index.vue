@@ -61,6 +61,7 @@ const chatMessages = computed(() =>
         // 有 code_result 的 CoderAgent 消息不显示
         return false
       }
+      // writer agent 不显示 ## TODO writer 应该显示
       // 其他 agent 或 system 消息正常显示
       return msg.msg_type === 'agent' && msg.content || msg.msg_type === 'system'
     }
