@@ -59,6 +59,8 @@ watch(() => props.messages, async (messages) => {
 </template>
 
 <style>
+@import 'katex/dist/katex.min.css';
+
 .section-enter-active,
 .section-leave-active {
   transition: all 0.5s ease;
@@ -125,5 +127,30 @@ watch(() => props.messages, async (messages) => {
 
 .prose thead {
   @apply bg-gray-50;
+}
+
+.prose code {
+  @apply bg-gray-100 px-1 py-0.5 rounded text-sm font-mono;
+}
+
+.prose pre {
+  @apply bg-gray-100 p-4 rounded-lg overflow-x-auto my-4;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0;
+}
+
+.prose .math-block {
+  @apply my-4 overflow-x-auto;
+  text-align: center;
+}
+
+.prose .katex-display {
+  @apply my-4 overflow-x-auto;
+}
+
+.prose .katex {
+  font-size: 1.1em;
 }
 </style>
