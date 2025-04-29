@@ -20,7 +20,7 @@ import ChatArea from '@/components/ChatArea.vue'
 import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
 import { TaskWebSocket } from '@/utils/websocket'
 import type { Message, CoderMessage, WriterMessage } from '@/utils/response'
-import messageData from '@/pages/test/message.json'
+import messageData from '@/pages/test/20250428-200915-ebc154d4.json'
 
 const props = defineProps<{ task_id: string }>()
 const messages = ref<Message[]>([])
@@ -62,6 +62,9 @@ const chatMessages = computed(() =>
         return false
       }
       // writer agent 不显示 ## TODO writer 应该显示
+      if (msg.msg_type === 'agent' && msg.agent_type === 'WriterAgent') {
+        return false
+      }
       // 其他 agent 或 system 消息正常显示
       return msg.msg_type === 'agent' && msg.content || msg.msg_type === 'system'
     }
@@ -76,7 +79,9 @@ const chatMessages = computed(() =>
 const coderMessages = computed(() =>
   messages.value.filter(
     (msg): msg is CoderMessage =>
-      msg.msg_type === 'agent' && msg.agent_type === 'CoderAgent'
+      msg.msg_type === 'agent' &&
+      msg.agent_type === 'CoderAgent' &&
+      (msg.code != null || msg.content != null)
   )
 )
 
@@ -84,7 +89,9 @@ const coderMessages = computed(() =>
 const writerMessages = computed(() =>
   messages.value.filter(
     (msg): msg is WriterMessage =>
-      msg.msg_type === 'agent' && msg.agent_type === 'WriterAgent'
+      msg.msg_type === 'agent' &&
+      msg.agent_type === 'WriterAgent' &&
+      msg.content != null
   )
 )
 
@@ -123,7 +130,7 @@ function downloadMessages() {
           <TabsContent value="coder" class="flex-1 p-1 min-w-0 h-full">
             <Card class="h-full min-w-0">
               <CardContent class="p-2 h-full min-w-0">
-                <CoderEditor class="h-full min-w-0" />
+                <CoderEditor :messages="coderMessages" class="h-full min-w-0" />
               </CardContent>
             </Card>
           </TabsContent>
@@ -131,7 +138,7 @@ function downloadMessages() {
           <TabsContent value="writer" class="flex-1 p-1 h-full overflow-hidden">
             <Card class="h-full">
               <CardContent class="p-2 h-full">
-                <WriterEditor />
+                <WriterEditor :messages="writerMessages" />
               </CardContent>
             </Card>
           </TabsContent>

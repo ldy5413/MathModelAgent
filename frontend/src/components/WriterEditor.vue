@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { marked } from 'marked';
+import { ref, watch } from 'vue';
+import { renderMarkdown } from '@/utils/markdown';
+import type { WriterMessage } from '@/utils/response'
 
 interface ContentSection {
   id: number;
@@ -8,12 +9,16 @@ interface ContentSection {
   renderedContent: string;
 }
 
+const props = defineProps<{
+  messages: WriterMessage[]
+}>()
+
 const sections = ref<ContentSection[]>([]);
 let nextId = 0;
 
 // 添加新的内容段落
 const appendContent = async (content: string) => {
-  const renderedContent = await marked(content);
+  const renderedContent = await renderMarkdown(content);
   sections.value.push({
     id: nextId++,
     content,
@@ -21,24 +26,19 @@ const appendContent = async (content: string) => {
   });
 };
 
-// 初始化示例内容
-onMounted(async () => {
-  // 模拟后端分段发送内容
-  await appendContent(`# 数学建模比赛论文`);
+// 监听消息变化
+watch(() => props.messages, async (messages) => {
+  // 清空现有内容
+  sections.value = [];
+  nextId = 0;
 
-  await appendContent(`## 摘要
-本文主要研究了...`);
-
-  await appendContent(`## 1. 问题重述
-### 1.1 背景介绍
-在当今快速发展的科技时代...`);
-
-  await appendContent(`### 1.2 问题分析
-根据题目要求，我们需要解决以下关键问题：
-1. 第一个关键问题
-2. 第二个关键问题
-3. 第三个关键问题`);
-});
+  // 按顺序添加每个消息的内容
+  for (const msg of messages) {
+    if (msg.content) {
+      await appendContent(msg.content);
+    }
+  }
+}, { immediate: true });
 </script>
 
 <template>
