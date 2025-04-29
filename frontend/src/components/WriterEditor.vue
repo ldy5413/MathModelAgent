@@ -42,7 +42,7 @@ watch(() => props.messages, async (messages) => {
 </script>
 
 <template>
-  <div class="h-full overflow-hidden bg-gray-50">
+  <div class="h-full overflow-hidden">
     <div class="h-full overflow-y-auto p-6">
       <div class="max-w-4xl mx-auto space-y-6">
         <TransitionGroup name="section" tag="div" class="space-y-6">

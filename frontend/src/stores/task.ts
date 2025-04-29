@@ -5,7 +5,8 @@ import type { Message, CoderMessage, WriterMessage } from '@/utils/response'
 import messageData from '@/test/20250429-192632-60df0e49.json'
 
 export const useTaskStore = defineStore('task', () => {
-  const messages = ref<Message[]>([])
+  // 初始化时直接加载测试数据，确保页面首次渲染时有数据
+  const messages = ref<Message[]>(messageData as Message[])
   let ws: TaskWebSocket | null = null
 
   // 连接 WebSocket
@@ -17,7 +18,8 @@ export const useTaskStore = defineStore('task', () => {
       console.log(data)
       messages.value.push(data)
     })
-    messages.value = messageData as Message[]
+    // 初始化测试数据（已在上面初始化，这里可以注释掉）
+    // messages.value = messageData as Message[]
     ws.connect()
   }
 
@@ -76,12 +78,18 @@ export const useTaskStore = defineStore('task', () => {
     for (let i = coderMessages.value.length - 1; i >= 0; i--) {
       const msg = coderMessages.value[i]
       if ('files' in msg && msg.files?.length) {
+        console.log('找到文件列表:', msg.files)
         return msg.files
       }
     }
+    // 如果没有找到文件列表，返回空数组
+    console.log('没有找到文件列表，返回空数组')
     return []
   })
   
+  // 初始化连接
+  // 如果需要自动连接，可以在这里添加代码
+  // 例如：connectWebSocket('default')
 
   return {
     messages,

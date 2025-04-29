@@ -40,7 +40,7 @@ const cells = computed<NoteCell[]>(() => {
 </script>
 
 <template>
-  <div class="flex-1 px-1 pt-1 pb-4 bg-gray-50 h-full overflow-y-auto">
+  <div class="flex-1 px-1 pt-1 pb-4 h-full overflow-y-auto">
     <!-- 遍历所有单元格 -->
     <div v-for="(cell, index) in cells" :key="index" 
          :class="[

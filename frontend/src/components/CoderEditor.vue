@@ -3,8 +3,8 @@ import { ref } from 'vue'
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from '@/components/ui/sidebar'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import Files from '@/components/Files.vue'
 import NotebookArea from '@/components/NotebookArea.vue'
 import {
@@ -13,34 +13,36 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable'
 
-const isCollapsed = ref(false)
-
-// 处理折叠状态
-const handleCollapse = () => {
-  isCollapsed.value = !isCollapsed.value
-}
-
 </script>
 <template>
-  <SidebarProvider :collapsed="isCollapsed">
-    <ResizablePanelGroup direction="horizontal" class="h-full w-full min-w-0 min-h-0">
-      <!-- 左侧 Files 面板 -->
-      <ResizablePanel :default-size="20" :min-size="10" :max-size="40" class="h-full">
-        <Files class="h-full border-r" />
-      </ResizablePanel>
-      <!-- 拖拽手柄 -->
-      <ResizableHandle />
-      <!-- 右侧 Notebook 面板 -->
-      <ResizablePanel :default-size="80" :min-size="60" class="h-full">
-        <SidebarInset class="flex-1 flex flex-col min-h-0 min-w-0 h-full">
-          <header class="flex h-10 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger class="-ml-1" @click="handleCollapse" />
-          </header>
-          <div class="flex-1 min-h-0 min-w-0 overflow-auto h-full">
-            <NotebookArea class="h-full min-w-0 pb-4" />
-          </div>
-        </SidebarInset>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+  <SidebarProvider>
+    <SidebarInset class="flex-1 flex flex-col min-h-0 min-w-0 h-full">
+      <div class="flex-1 min-h-0 min-w-0 overflow-auto h-full">
+        <ResizablePanelGroup direction="horizontal" class="h-full w-full">
+          <ResizablePanel :default-size="25" :min-size="15" class="h-full w-full flex flex-1">
+            <ScrollArea class="h-full w-full flex flex-1">
+              <Files class="h-full w-full fixed" />
+            </ScrollArea>
+
+          </ResizablePanel>
+          
+          <ResizableHandle with-handle />
+          <ResizablePanel :default-size="75" :min-size="30" class="h-full w-full flex flex-1">
+            <ScrollArea class="h-full w-full flex flex-1">
+              <NotebookArea class="h-full min-w-0 pb-4" />
+            </ScrollArea>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+
+      </div>
+    </SidebarInset>
   </SidebarProvider>
 </template>
+
+<style scoped>
+
+::-webkit-scrollbar {
+  display: none; /* 或者 width: 0; height: 0; */
+}
+
+</style>
