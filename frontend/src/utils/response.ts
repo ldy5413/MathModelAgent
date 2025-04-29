@@ -5,7 +5,7 @@ export type AgentType = 'CoderAgent' | 'WriterAgent';
 export interface BaseMessage {
   id: string;
   msg_type: 'system' | 'agent' | 'user';
-  content?: string;
+  content?: string | null;
 }
 
 export interface SystemMessage extends BaseMessage {

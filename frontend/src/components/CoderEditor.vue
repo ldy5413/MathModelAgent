@@ -1,9 +1,5 @@
-<script lang="ts">
-export const description = 'A sidebar with a collapsible file tree.'
-export const iframeHeight = '800px'
-</script>
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import {
   SidebarInset,
   SidebarProvider,
@@ -16,86 +12,6 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from '@/components/ui/resizable'
-import type { CoderMessage } from '@/utils/response'
-
-interface Cell {
-  type: 'markdown' | 'code'
-  content: string
-  output: {
-    type: 'text' | 'table' | 'plot'
-    content?: string
-    data?: {
-      headers?: string[]
-      rows?: any[][]
-    }
-  } | null
-  isPreview?: boolean
-}
-
-const props = defineProps<{
-  messages: CoderMessage[]
-}>()
-
-// 将代码执行结果转换为Notebook单元格
-const cells = computed<Cell[]>(() => {
-  const notebookCells: Cell[] = []
-
-  for (const msg of props.messages) {
-    // 如果有普通内容，创建markdown单元格
-    if (msg.content) {
-      notebookCells.push({
-        type: 'markdown',
-        content: msg.content,
-        output: null,
-        isPreview: true
-      })
-    }
-
-    // 如果有代码，创建代码单元格
-    if (msg.code) {
-      const cell: Cell = {
-        type: 'code',
-        content: msg.code,
-        output: null
-      }
-
-      // 如果有执行结果，添加到输出
-      if (msg.code_results && msg.code_results.length > 0) {
-        const result = msg.code_results[0] // 暂时只取第一个结果
-
-        if (result.res_type === 'result') {
-          cell.output = {
-            type: 'table',
-            data: {
-              headers: [],
-              rows: []
-            }
-          }
-          try {
-            const data = JSON.parse(result.msg || '{}')
-            if (data.headers && data.rows) {
-              cell.output.data = data
-            }
-          } catch (e) {
-            cell.output = {
-              type: 'text',
-              content: result.msg || ''
-            }
-          }
-        } else {
-          cell.output = {
-            type: 'text',
-            content: result.msg || ''
-          }
-        }
-      }
-
-      notebookCells.push(cell)
-    }
-  }
-
-  return notebookCells
-})
 
 const isCollapsed = ref(false)
 
@@ -103,7 +19,6 @@ const isCollapsed = ref(false)
 const handleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
 }
-
 
 </script>
 <template>
@@ -121,8 +36,8 @@ const handleCollapse = () => {
           <header class="flex h-10 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger class="-ml-1" @click="handleCollapse" />
           </header>
-          <div class="flex-1 min-h-0 min-w-0 overflow-auto">
-            <NotebookArea :cells="cells" class="h-full min-w-0" />
+          <div class="flex-1 min-h-0 min-w-0 overflow-auto h-full">
+            <NotebookArea class="h-full min-w-0 pb-4" />
           </div>
         </SidebarInset>
       </ResizablePanel>

@@ -323,6 +323,7 @@ class E2BCodeInterpreter:
     async def get_created_images(self, section: str) -> list[str]:
         """获取当前 section 创建的图片列表"""
         if not self.sbx:
+            logger.warning("沙箱环境未初始化")
             return []
 
         try:
@@ -335,6 +336,7 @@ class E2BCodeInterpreter:
             self.created_images = list(
                 set(self.section_output[section]["images"]) - set(self.created_images)
             )
+            logger.info(f"{section}-获取创建的图片列表: {self.created_images}")
             return self.created_images
         except Exception as e:
             logger.error(f"获取创建的图片列表失败: {str(e)}")
@@ -388,6 +390,10 @@ class E2BCodeInterpreter:
             # 下载新文件或更新已修改的文件
             for file in sandbox_files:
                 try:
+                    # 排除 .bash_logout、.bashrc 和 .profile 文件
+                    if file.name in [".bash_logout", ".bashrc", ".profile"]:
+                        continue
+
                     local_path = os.path.join(self.work_dir, file.name)
                     should_download = True
 
@@ -398,19 +404,14 @@ class E2BCodeInterpreter:
                         pass
 
                     if should_download:
-                        content = await self.sbx.files.read(file.path)
+                        # 使用 bytes 格式读取文件内容，确保正确处理二进制数据
+                        content = await self.sbx.files.read(file.path, format="bytes")
 
                         # 确保目标目录存在
                         os.makedirs(self.work_dir, exist_ok=True)
 
                         # 写入文件
                         with open(local_path, "wb") as f:
-                            if isinstance(content, str):
-                                if "," in content:  # 处理data URL格式
-                                    content = content.split(",")[1]
-                                    content = base64.b64decode(content)
-                                else:
-                                    content = content.encode("utf-8")
                             f.write(content)
                         logger.info(f"同步文件: {file.name}")
 

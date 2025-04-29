@@ -75,7 +75,7 @@ def get_writer_prompt(
         skill：熟练掌握{format_output}排版,
         output：你需要按照要求的格式排版,只输出{format_output}排版的内容
         
-        1. 当你输入图像引用时候，image_name.png,就可正确引用显示
+        1. 当你输入图像引用时候，使用![image_name](image_name.png)
         2. 你不需要输出markdown的这个```markdown格式，只需要输出markdown的内容
         3. 严格按照参考用户输入的格式模板以及**正确的编号顺序**
         4. 不需要询问用户

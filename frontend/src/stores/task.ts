@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { TaskWebSocket } from '@/utils/websocket'
 import type { Message, CoderMessage, WriterMessage } from '@/utils/response'
-import messageData from '@/test/20250428-200915-ebc154d4.json'
+import messageData from '@/test/20250429-192632-60df0e49.json'
 
 export const useTaskStore = defineStore('task', () => {
   const messages = ref<Message[]>([])
@@ -57,7 +57,7 @@ export const useTaskStore = defineStore('task', () => {
       (msg): msg is CoderMessage =>
         msg.msg_type === 'agent' &&
         msg.agent_type === 'CoderAgent' &&
-        (msg.code != null || msg.content != null)
+        (msg.code != null || msg.code_results != null)
     )
   )
 
