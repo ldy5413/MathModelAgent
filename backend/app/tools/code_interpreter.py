@@ -17,6 +17,9 @@ from app.utils.log_util import logger
 import asyncio
 from app.config.setting import settings
 import json
+import base64
+
+from app.utils.common_utils import get_current_files
 
 
 def delete_color_control_char(string):
@@ -284,11 +287,18 @@ class E2BCodeInterpreter:
                         f"[{item.format} 图片已生成，内容为 base64，未展示]"
                     )
 
+        combined_text = "\n".join(text_to_gpt)
+
+        # 在代码执行完成后，立即同步文件
+        try:
+            await self.download_all_files_from_sandbox()
+            logger.info("文件同步完成")
+        except Exception as e:
+            logger.error(f"文件同步失败: {str(e)}")
+
         # 保存到分段内容
         ## TODO: Base64 等图像需要优化
         await self._push_to_websocket(content_to_display)
-
-        combined_text = "\n".join(text_to_gpt)
 
         return (
             combined_text,
@@ -302,6 +312,7 @@ class E2BCodeInterpreter:
         agent_msg = CoderMessage(
             agent_type=AgentType.CODER,
             code_results=content_to_display,
+            files=get_current_files(self.work_dir, "all"),
         )
         logger.debug(f"发送消息: {agent_msg.model_dump_json()}")
         await redis_manager.publish_message(
@@ -346,36 +357,71 @@ class E2BCodeInterpreter:
 
     async def cleanup(self):
         """清理资源并关闭沙箱"""
-
-        if not await self.sbx.is_running():
-            logger.warning("沙箱已经关闭了")
-
         try:
             if self.sbx:
-                ## TODO: 生成一个文件，下载一份文件
-                await self.download_all_files_from_sandbox()
-                await self.sbx.kill()
-                logger.info("成功关闭沙箱环境")
+                if await self.sbx.is_running():
+                    try:
+                        await self.download_all_files_from_sandbox()
+                    except Exception as e:
+                        logger.error(f"下载文件失败: {str(e)}")
+                    finally:
+                        await self.sbx.kill()
+                        logger.info("成功关闭沙箱环境")
+                else:
+                    logger.warning("沙箱已经关闭，跳过清理步骤")
         except Exception as e:
             logger.error(f"清理沙箱环境失败: {str(e)}")
-            raise
+            # 这里可以选择不抛出异常，因为这是清理步骤
 
     async def download_all_files_from_sandbox(self) -> None:
-        """从沙箱中下载所有文件"""
+        """从沙箱中下载所有文件并与本地同步"""
         try:
-            files = await self.sbx.files.list("/home/user")
-            for file in files:
-                content = await self.sbx.files.read(file.path)
-                output_path = os.path.join(self.work_dir, file.name)
-                # 修复：确保写入文件时 content 一定是 bytes 类型
-                if isinstance(content, str):
-                    content = content.encode("utf-8")
-                with open(output_path, "wb") as f:
-                    f.write(content)
-                logger.info(f"成功下载文件: {file.name}")
+            # 获取沙箱中的文件列表
+            sandbox_files = await self.sbx.files.list("/home/user")
+            sandbox_files_dict = {f.name: f for f in sandbox_files}
+
+            # 获取本地文件列表
+            local_files = set()
+            if os.path.exists(self.work_dir):
+                local_files = set(os.listdir(self.work_dir))
+
+            # 下载新文件或更新已修改的文件
+            for file in sandbox_files:
+                try:
+                    local_path = os.path.join(self.work_dir, file.name)
+                    should_download = True
+
+                    # 检查文件是否需要更新
+                    if file.name in local_files:
+                        # 这里可以添加文件修改时间或内容哈希的比较
+                        # 暂时简单处理，有同名文件就更新
+                        pass
+
+                    if should_download:
+                        content = await self.sbx.files.read(file.path)
+
+                        # 确保目标目录存在
+                        os.makedirs(self.work_dir, exist_ok=True)
+
+                        # 写入文件
+                        with open(local_path, "wb") as f:
+                            if isinstance(content, str):
+                                if "," in content:  # 处理data URL格式
+                                    content = content.split(",")[1]
+                                    content = base64.b64decode(content)
+                                else:
+                                    content = content.encode("utf-8")
+                            f.write(content)
+                        logger.info(f"同步文件: {file.name}")
+
+                except Exception as e:
+                    logger.error(f"同步文件 {file.name} 失败: {str(e)}")
+                    continue
+
+            logger.info("文件同步完成")
+
         except Exception as e:
-            logger.error(f"下载文件失败: {str(e)}")
-            # 这里不再 raise，防止 cleanup 阶段因沙箱已关闭而报错
+            logger.error(f"文件同步失败: {str(e)}")
 
     async def shutdown_sandbox(self):
         """关闭沙箱环境"""

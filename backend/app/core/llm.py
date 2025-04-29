@@ -5,6 +5,7 @@ import time
 from app.schemas.response import AgentMessage, CoderMessage, WriterMessage
 from app.utils.enums import AgentType
 from app.utils.redis_manager import redis_manager
+import re
 
 
 class LLM:
@@ -79,6 +80,13 @@ class LLM:
         if agent_name == "CoderAgent":
             agent_msg: CoderMessage = CoderMessage(content=content, code=code)
         elif agent_name == "WriterAgent":
+            # 判断content是否包含图片 xx.png,对其处理为    http://localhost:8000/static/20250428-200915-ebc154d4/512.jpg
+            if re.search(r"\.(png|jpg|jpeg|gif|bmp|webp)$", content):
+                content = re.sub(
+                    r"\.(png|jpg|jpeg|gif|bmp|webp)$",
+                    lambda match: f"http://localhost:8000/static/{self.task_id}/{match.group(0)}",
+                    content,
+                )
             agent_msg: WriterMessage = WriterMessage(content=content)
         else:
             raise ValueError(f"无效的agent_name: {agent_name}")

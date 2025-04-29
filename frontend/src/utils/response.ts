@@ -66,6 +66,7 @@ export interface CoderMessage extends AgentMessage {
   agent_type: 'CoderAgent';
   code?: string;
   code_results?: CodeExecutionResult[];
+  files?: string[];
 }
 
 export interface WriterMessage extends AgentMessage {

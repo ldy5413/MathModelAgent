@@ -282,24 +282,17 @@ class WriterAgent(Agent):  # 同样继承自Agent类
         self,
         prompt: str,
         available_images: list[str] = None,
-        static_prefix: str = "/static/",
     ) -> str:
         """
         执行写作任务
         Args:
             prompt: 写作提示
             available_images: 可用的图片相对路径列表（如 20250420-173744-9f87792c/编号_分布.png）
-            static_prefix: 静态资源前缀
         """
         if available_images:
             self.available_images = available_images
             # 拼接成完整URL
-            image_list = "\n".join(
-                [
-                    f"- {static_prefix}{img if img.startswith('/') else '/' + img}"
-                    for img in available_images
-                ]
-            )
+            image_list = ",".join(available_images)
             image_prompt = f"\n可用的图片链接列表：\n{image_list}\n请在写作时适当引用这些图片链接。"
             prompt = prompt + image_prompt
 

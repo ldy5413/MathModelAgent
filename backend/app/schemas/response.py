@@ -72,6 +72,7 @@ class CoderMessage(AgentMessage):
     agent_type: AgentType = AgentType.CODER
     code: str | None = None
     code_results: list[OutputItem] | None = None
+    files: list[str] | None = None
 
 
 class WriterMessage(AgentMessage):
