@@ -68,9 +68,9 @@ onBeforeUnmount(() => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="writer" class="flex-1 p-1 min-w-0 h-full">
+            <TabsContent value="writer" class="flex-1 p-1 min-w-0 h-full overflow-auto">
               <Card class="min-w-0 rounded-lg">
-                <CardContent class="p-2 h-full min-w-0 overflow-hidden">
+                <CardContent class="p-2 h-full min-w-0 overflow-auto">
                   <WriterEditor :messages="taskStore.writerMessages" />
                 </CardContent>
               </Card>
@@ -87,7 +87,8 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-:deep(body), :deep(html) {
+:deep(body),
+:deep(html) {
   overflow: hidden;
   height: 100%;
   margin: 0;

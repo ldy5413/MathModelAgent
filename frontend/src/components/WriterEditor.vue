@@ -70,7 +70,7 @@ watch(() => props.messages, async (messages) => {
 
 <template>
   <ScrollArea class="h-full overflow-y-auto p-6">
-    <div class="max-w-4xl mx-auto space-y-6">
+    <div class="max-w-4xl mx-auto overflow-y-auto space-y-6">
       <TransitionGroup name="section" tag="div" class="space-y-6">
         <div v-for="section in sortedSections" :key="section.id"
           class="bg-white rounded-lg shadow-lg overflow-hidden transform transition-all duration-500">
