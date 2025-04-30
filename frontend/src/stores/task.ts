@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { TaskWebSocket } from '@/utils/websocket'
 import type { Message, CoderMessage, WriterMessage } from '@/utils/response'
-import messageData from '@/test/20250429-192632-60df0e49.json'
+import messageData from '@/test/20250430-163507-03282e09.json'
 
 export const useTaskStore = defineStore('task', () => {
   // 初始化时直接加载测试数据，确保页面首次渲染时有数据

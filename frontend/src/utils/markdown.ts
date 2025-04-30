@@ -1,6 +1,6 @@
 import { marked } from 'marked'
 import katex from 'katex'
-import type { RendererObject, Renderer } from 'marked'
+import type { RendererObject, Renderer, Token } from 'marked'
 
 // 默认的markdown渲染配置
 const defaultOptions = {
@@ -30,6 +30,15 @@ const renderer: Partial<RendererObject> = {
   paragraph(this: Renderer, token: { text: string }) {
     let text = token.text
 
+    // 先处理图片链接，避免被误识别为数学公式
+    const imagePattern = /!\[(.*?)\]\((.*?)\)/g
+    const images: Array<[string, string, string]> = []
+    let imageIndex = 0
+    text = text.replace(imagePattern, (match, alt, src) => {
+      images.push([match, alt, src])
+      return `__IMAGE_PLACEHOLDER_${imageIndex++}__`
+    })
+
     // 处理块级公式
     if (text.startsWith('\\[') && text.endsWith('\\]')) {
       const tex = text.slice(2, -2).trim()
@@ -50,12 +59,34 @@ const renderer: Partial<RendererObject> = {
       })
     }
 
+    // 还原图片占位符
+    text = text.replace(/__IMAGE_PLACEHOLDER_(\d+)__/g, (_, index) => {
+      const [, alt, src] = images[parseInt(index)]
+      return `<img src="${src}" alt="${alt}" class="max-w-full h-auto" />`
+    })
+
     return `<p>${text}</p>`
   }
 }
 
 // 配置marked
 marked.use({ renderer })
+
+// 配置图片处理
+marked.use({
+  hooks: {
+    preprocess(markdown) {
+      // 处理图片链接
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+      const taskId = window.localStorage.getItem('currentTaskId') || ''
+      
+      return markdown.replace(
+        /!\[(.*?)\]\(((?!http[s]?:\/\/).*?\.(?:png|jpg|jpeg|gif|bmp|webp))\)/g,
+        (_, alt, src) => `![${alt}](${baseUrl}/static/${taskId}/${src})`
+      )
+    }
+  }
+})
 
 /**
  * 渲染Markdown文本为HTML
