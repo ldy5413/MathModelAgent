@@ -7,6 +7,7 @@ import messageData from '@/test/20250430-163507-03282e09.json'
 export const useTaskStore = defineStore('task', () => {
   // 初始化时直接加载测试数据，确保页面首次渲染时有数据
   const messages = ref<Message[]>(messageData as Message[])
+  // const messages = ref<Message[]>([])
   let ws: TaskWebSocket | null = null
 
   // 连接 WebSocket

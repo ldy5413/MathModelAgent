@@ -40,9 +40,7 @@ onBeforeUnmount(() => {
   <div class="fixed inset-0">
     <ResizablePanelGroup direction="horizontal" class="h-full rounded-lg border">
       <ResizablePanel :default-size="30" class="h-full">
-        <ScrollArea class="h-full">
-          <ChatArea :messages="taskStore.chatMessages" />
-        </ScrollArea>
+        <ChatArea :messages="taskStore.chatMessages" />
       </ResizablePanel>
       <ResizableHandle />
       <ResizablePanel :default-size="70" class="h-full min-w-0">
@@ -61,7 +59,7 @@ onBeforeUnmount(() => {
             </div>
 
             <TabsContent value="coder" class="h-full p-1 flex-1 overflow-auto">
-              <Card class="h-full m-1">
+              <Card class="h-full m-2">
                 <CardContent class="h-full p-1">
                   <CoderEditor />
                 </CardContent>
