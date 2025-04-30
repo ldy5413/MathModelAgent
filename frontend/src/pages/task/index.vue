@@ -17,18 +17,24 @@ import {
 import CoderEditor from '@/components/CoderEditor.vue'
 import WriterEditor from '@/components/WriterEditor.vue'
 import ChatArea from '@/components/ChatArea.vue'
-import { onMounted, onBeforeUnmount } from 'vue'
+import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { useTaskStore } from '@/stores/task'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { getWriterSeque } from '@/apis/commonApi';
 
 const props = defineProps<{ task_id: string }>()
 const taskStore = useTaskStore()
 
+const writerSequence = ref<string[]>([]);
+
 console.log('Task ID:', props.task_id)
 
-onMounted(() => {
+onMounted(async () => {
   taskStore.connectWebSocket(props.task_id)
+  const res = await getWriterSeque();
+  writerSequence.value = Array.isArray(res.data) ? res.data : [];
 })
+
 
 onBeforeUnmount(() => {
   taskStore.closeWebSocket()
@@ -69,7 +75,7 @@ onBeforeUnmount(() => {
             <TabsContent value="writer" class="flex-1 p-1 min-w-0 h-full overflow-auto">
               <Card class="min-w-0 rounded-lg">
                 <CardContent class="p-2 h-full min-w-0 overflow-auto">
-                  <WriterEditor :messages="taskStore.writerMessages" />
+                  <WriterEditor :messages="taskStore.writerMessages" :writerSequence="writerSequence" />
                 </CardContent>
               </Card>
             </TabsContent>

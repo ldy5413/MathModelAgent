@@ -3,7 +3,6 @@ import { onMounted, ref, watch, computed } from 'vue';
 import { renderMarkdown } from '@/utils/markdown';
 import type { WriterMessage } from '@/utils/response'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { getWriterSeque } from '@/apis/commonApi';
 
 interface ContentSection {
   id: number;
@@ -14,14 +13,10 @@ interface ContentSection {
 
 const props = defineProps<{
   messages: WriterMessage[]
+  writerSequence: string[]
 }>()
 
-const writerSequence = ref<string[]>([]);
 
-onMounted(async () => {
-  const res = await getWriterSeque();
-  writerSequence.value = Array.isArray(res.data) ? res.data : [];
-});
 
 const sections = ref<ContentSection[]>([]);
 let nextId = 0;
@@ -39,11 +34,11 @@ const appendContent = async (content: string, sub_title?: string) => {
 
 // 根据 writerSequence 排序内容
 const sortedSections = computed(() => {
-  if (!writerSequence.value.length) return sections.value;
+  if (!props.writerSequence.length) return sections.value;
 
   return [...sections.value].sort((a, b) => {
-    const aIndex = a.sub_title ? writerSequence.value.indexOf(a.sub_title) : Infinity;
-    const bIndex = b.sub_title ? writerSequence.value.indexOf(b.sub_title) : Infinity;
+    const aIndex = a.sub_title ? props.writerSequence.indexOf(a.sub_title) : Infinity;
+    const bIndex = b.sub_title ? props.writerSequence.indexOf(b.sub_title) : Infinity;
 
     if (aIndex === Infinity && bIndex === Infinity) return 0;
     if (aIndex === Infinity) return 1;
@@ -73,7 +68,7 @@ watch(() => props.messages, async (messages) => {
     <div class="max-w-4xl mx-auto overflow-y-auto space-y-6">
       <TransitionGroup name="section" tag="div" class="space-y-6">
         <div v-for="section in sortedSections" :key="section.id"
-          class="bg-white rounded-lg shadow-lg overflow-hidden transform transition-all duration-500">
+          class="bg-white rounded-lg shadow-lg transform transition-all duration-500">
           <div class="p-6">
             <div class="prose prose-slate max-w-none" v-html="section.renderedContent"></div>
           </div>
@@ -142,16 +137,16 @@ watch(() => props.messages, async (messages) => {
 }
 
 .prose table {
-  @apply w-full border-collapse border border-gray-300 my-4;
+  @apply w-full border-collapse border border-gray-800;
 }
 
 .prose th,
 .prose td {
-  @apply border border-gray-300 p-2;
+  @apply border border-gray-800 p-1 text-center;
 }
 
-.prose thead {
-  @apply bg-gray-50;
+.prose th {
+  @apply font-bold text-gray-900 text-center;
 }
 
 .prose code {

@@ -115,7 +115,7 @@ class E2BCodeInterpreter:
         )
         await self.execute_code(init_code)
 
-    def _truncate_text(self, text: str, max_length: int = 2000) -> str:
+    def _truncate_text(self, text: str, max_length: int = 1000) -> str:
         """截断文本，保留开头和结尾的重要信息"""
         if len(text) <= max_length:
             return text

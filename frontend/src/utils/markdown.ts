@@ -39,14 +39,14 @@ const renderer: Partial<RendererObject> = {
       return `__IMAGE_PLACEHOLDER_${imageIndex++}__`
     })
 
-    // 处理块级公式
-    if (text.startsWith('\\[') && text.endsWith('\\]')) {
+    // 处理块级公式（使用 $$ 包裹）
+    if (text.startsWith('$$') && text.endsWith('$$')) {
       const tex = text.slice(2, -2).trim()
       return `<div class="math-block">${renderMath(tex, true)}</div>`
     }
 
-    // 处理行内公式
-    text = text.replace(/\\\((.*?)\\\)/g, (_, tex) => renderMath(tex.trim(), false))
+    // 处理行内公式（使用 $ 包裹）
+    text = text.replace(/\$(.*?)\$/g, (_, tex) => renderMath(tex.trim(), false))
     
     // 处理带括号的公式，确保不是已经处理过的
     if (!text.includes('class="katex"')) {
