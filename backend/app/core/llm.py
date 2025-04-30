@@ -1,4 +1,5 @@
 import json
+from app.utils.common_utils import transform_link
 from openai import OpenAI
 from app.utils.log_util import logger
 import time
@@ -33,7 +34,10 @@ class LLM:
         retry_delay: float = 1.0,  # 添加重试延迟
         top_p: float | None = None,  # 添加top_p参数,
         agent_name: str = "NO_NAME",  # CoderAgent or WriterAgent
+        sub_title: str | None = None,
     ) -> str:
+        logger.info(f"subtitle是:{sub_title}")
+
         kwargs = {
             "model": self.model,
             "messages": history,
@@ -52,10 +56,11 @@ class LLM:
         for attempt in range(max_retries):
             try:
                 completion = self.client.chat.completions.create(**kwargs)
+                logger.info(f"API返回: {completion}")
                 if not completion or not hasattr(completion, "choices"):
                     raise ValueError("无效的API响应")
                 self.chat_count += 1
-                await self.analyse_completion(completion, agent_name)
+                await self.analyse_completion(completion, agent_name, sub_title)
                 return completion
             except json.JSONDecodeError:
                 logger.error(f"第{attempt + 1}次重试: API返回无效JSON")
@@ -65,7 +70,9 @@ class LLM:
                 logger.debug(f"请求参数: {kwargs}")
                 raise  # 如果所有重试都失败，则抛出异常
 
-    async def analyse_completion(self, completion, agent_name):
+    async def analyse_completion(self, completion, agent_name, sub_title):
+        logger.info(f"subtitle是:{sub_title}")
+
         code = ""
         if (
             hasattr(completion.choices[0].message, "tool_calls")
@@ -74,20 +81,22 @@ class LLM:
             tool_call = completion.choices[0].message.tool_calls[0]
             if tool_call.function.name == "execute_code":
                 code = json.loads(tool_call.function.arguments)["code"]
-        await self.send_message(agent_name, completion.choices[0].message.content, code)
+        (
+            await self.send_message(
+                agent_name, completion.choices[0].message.content, code, sub_title
+            )
+        )
 
-    async def send_message(self, agent_name, content, code=""):
+    async def send_message(self, agent_name, content, code="", sub_title=None):
+        logger.info(f"subtitle是:{sub_title}")
         if agent_name == "CoderAgent":
             agent_msg: CoderMessage = CoderMessage(content=content, code=code)
         elif agent_name == "WriterAgent":
-            # 判断content是否包含图片 xx.png,对其处理为    http://localhost:8000/static/20250428-200915-ebc154d4/512.jpg
-            if re.search(r"\.(png|jpg|jpeg|gif|bmp|webp)$", content):
-                content = re.sub(
-                    r"\.(png|jpg|jpeg|gif|bmp|webp)$",
-                    lambda match: f"http://localhost:8000/static/{self.task_id}/{match.group(0)}",
-                    content,
-                )
-            agent_msg: WriterMessage = WriterMessage(content=content)
+            # 处理 Markdown 格式的图片语法
+            content = transform_link(self.task_id, content)
+            agent_msg: WriterMessage = WriterMessage(
+                content=content, sub_title=sub_title
+            )
         else:
             raise ValueError(f"无效的agent_name: {agent_name}")
 

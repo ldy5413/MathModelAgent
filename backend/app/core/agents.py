@@ -34,7 +34,7 @@ class Agent:
         self.current_chat_turns = 0  # 当前对话轮次计数器
         self.user_output = user_output
 
-    async def run(self, prompt: str, system_prompt: str) -> str:
+    async def run(self, prompt: str, system_prompt: str, sub_title: str) -> str:
         """
         执行agent的对话并返回结果和总结
 
@@ -54,7 +54,9 @@ class Agent:
 
             # 获取历史消息用于本次对话
             response = await self.model.chat(
-                history=self.chat_history, agent_name=self.__class__.__name__
+                history=self.chat_history,
+                agent_name=self.__class__.__name__,
+                sub_title=sub_title,
             )
             response_content = response.choices[0].message.content
             self.chat_history.append({"role": "assistant", "content": response_content})
@@ -140,7 +142,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                 f"Failed to complete task after {self.max_retries} attempts. Last error: {last_error_message}"
             )
 
-            # try:
+        # try:
         while (
             not task_completed
             and retry_count < self.max_retries
@@ -189,6 +191,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                     )
 
                     # 执行工具调用
+                    logger.warning("执行工具调用")
                     (
                         text_to_gpt,
                         error_occurred,
@@ -207,6 +210,8 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                     )
 
                     if error_occurred:
+                        logger.warning("代码执行错误")
+
                         retry_count += 1
                         last_error_message = error_message
                         reflection_prompt = get_reflection_prompt(error_message, code)
@@ -224,6 +229,8 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                     # 检查任务完成情况时也计入对话轮次
                     self.current_chat_turns += 1
                     # 使用所有执行结果生成检查提示
+                    logger.warning("判断是否完成")
+
                     completion_check_prompt = get_completion_check_prompt(
                         prompt, text_to_gpt
                     )
@@ -245,6 +252,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                         hasattr(completion_response.choices[0].message, "tool_calls")
                         and completion_response.choices[0].message.tool_calls
                     ):
+                        logger.warning("没有调用工具，代表已经完成了")
                         task_completed = True
                         return completion_response.choices[0].message.content
 
@@ -282,13 +290,17 @@ class WriterAgent(Agent):  # 同样继承自Agent类
         self,
         prompt: str,
         available_images: list[str] = None,
+        sub_title: str = None,
     ) -> str:
         """
         执行写作任务
         Args:
             prompt: 写作提示
             available_images: 可用的图片相对路径列表（如 20250420-173744-9f87792c/编号_分布.png）
+            sub_title: 子任务标题
         """
+        logger.info(f"subtitle是:{sub_title}")
+
         if available_images:
             self.available_images = available_images
             # 拼接成完整URL
@@ -296,7 +308,7 @@ class WriterAgent(Agent):  # 同样继承自Agent类
             image_prompt = f"\n可用的图片链接列表：\n{image_list}\n请在写作时适当引用这些图片链接。"
             prompt = prompt + image_prompt
 
-        return await super().run(prompt, self.system_prompt)
+        return await super().run(prompt, self.system_prompt, sub_title)
 
     async def summarize(self) -> str:
         """

@@ -71,6 +71,7 @@ export interface CoderMessage extends AgentMessage {
 
 export interface WriterMessage extends AgentMessage {
   agent_type: 'WriterAgent';
+  sub_title?: string;
 }
 
 export type Message = SystemMessage | UserMessage | CoderMessage | WriterMessage;

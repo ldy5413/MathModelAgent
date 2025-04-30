@@ -115,7 +115,7 @@ class E2BCodeInterpreter:
         )
         await self.execute_code(init_code)
 
-    def _truncate_text(self, text: str, max_length: int = 5000) -> str:
+    def _truncate_text(self, text: str, max_length: int = 2000) -> str:
         """截断文本，保留开头和结尾的重要信息"""
         if len(text) <= max_length:
             return text
@@ -264,6 +264,7 @@ class E2BCodeInterpreter:
                             msg=result._repr_javascript_(),
                         )
                     )
+
                     # 处理主要结果
                 # if result.is_main_result and result.text:
                 #     result_text = self._truncate_text(result.text)
@@ -278,14 +279,22 @@ class E2BCodeInterpreter:
         for item in content_to_display:
             if isinstance(item, dict):
                 if item.get("type") in ["stdout", "stderr", "error"]:
-                    text_to_gpt.append(item.get("content") or item.get("value") or "")
+                    text_to_gpt.append(
+                        self._truncate_text(
+                            item.get("content") or item.get("value") or ""
+                        )
+                    )
             elif isinstance(item, ResultModel):
                 if item.format in ["text", "html", "markdown", "json"]:
-                    text_to_gpt.append(f"[{item.format}]\n{item.msg}")
+                    text_to_gpt.append(
+                        self._truncate_text(f"[{item.format}]\n{item.msg}")
+                    )
                 elif item.format in ["png", "jpeg", "svg", "pdf"]:
                     text_to_gpt.append(
                         f"[{item.format} 图片已生成，内容为 base64，未展示]"
                     )
+
+        logger.info(f"text_to_gpt: {text_to_gpt}")
 
         combined_text = "\n".join(text_to_gpt)
 

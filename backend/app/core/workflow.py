@@ -126,6 +126,7 @@ class MathModelWorkFlow(WorkFlow):
             writer_response = await writer_agent.run(
                 writer_prompt,
                 available_images=await e2b_code_interpreter.get_created_images(key),
+                sub_title=key,
             )
 
             await redis_manager.publish_message(
@@ -156,7 +157,7 @@ class MathModelWorkFlow(WorkFlow):
                 comp_template=problem.comp_template,
                 format_output=problem.format_output,
             )
-            writer_response = await writer_agent.run(value)
+            writer_response = await writer_agent.run(prompt=value, sub_title=key)
             user_output.set_res(key, writer_response)
 
         logger.info(user_output.get_res())

@@ -77,6 +77,7 @@ class CoderMessage(AgentMessage):
 
 class WriterMessage(AgentMessage):
     agent_type: AgentType = AgentType.WRITER
+    sub_title: str | None = None
 
 
 # 所有可能的消息类型
