@@ -15,7 +15,9 @@
 自动完整一份可以获奖级别的建模论文
 
 <p align="center">
-    <img src="./docs/webui.png">
+    <img src="./docs/index.png">
+    <img src="./docs/coder.png">
+    <img src="./docs/writer.png">
 </p>
 
 ## ✨ 功能特性
@@ -41,50 +43,93 @@
 - [ ] 引入用户的交互（选择模型，重写等等）
 - [ ] codeinterpreter 接入云端 如 e2b 等供应商..
 - [ ] 多语言: R 语言, matlab
-
-clone 项目后，下载**Todo Tree**插件，可以查看代码中所有具体位置的 todo
+- [ ] 绘图 napki,draw.io
 
 ## 视频demo
 
-<video src="https://github.com/user-attachments/assets/10b3145a-feb7-4894-aaca-30d44bb35b9e"></video>
+<video src="https://github.com/user-attachments/assets/954cb607-8e7e-45c6-8b15-f85e204a0c5d"></video>
 
 ## 📖 使用教程
 
-1. 安装依赖
+> 确保电脑中安装好 Python, Nodejs, **Redis** 环境
+
+> 如果你想运行 命令行版本 cli 切换到 [master](https://github.com/jihe520/MathModelAgent/tree/master) 分支,部署更简单，但未来不会更新
+
+
+
+1. 配置模型
+
+复制`/backend/.env.dev.example`到`/backend/.env.dev`(删除`.example` 后缀), 填写配置模型和 APIKEY
+[deepseek开发者平台](https://platform.deepseek.com/)
 
 ```bash
-git clone https://github.com/jihe520/MathModelAgent.git # 克隆项目
-pip install uv # 推荐使用 uv 管理 python 项目
-uv venv # 创建虚拟环境
-uv sync # 安装依赖
+ENV=dev
+#兼容 OpenAI 格式都行，具体看官方文档
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=
+DEEPSEEK_BASE_URL=
+# 模型最大问答次数
+MAX_CHAT_TURNS=60
+# 思考反思次数
+MAX_RETRIES=5
+# https://e2b.dev/ 
+E2B_API_KEY=
+
+LOG_LEVEL=DEBUG
+DEBUG=true
+# 确保安装 Redis
+REDIS_URL=redis://localhost:6379/0
+REDIS_MAX_CONNECTIONS=20
+CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
-
-2. 配置模型
-
-复制`/config/config.toml.example`到`/config/config.toml`, 填写配置模型和 APIKEY
-[deepseek开发者平台](https://platform.deepseek.com/)
 
 推荐模型能力较强的、参数量大的模型。
 
-3. 运行测试 和 启动项目
+2. 安装依赖
+
+下载项目
 
 ```bash
-uv run example.py # 简单测试能否正确运行
-uv run webui.py # 推荐: 启动 webui
-uv run terminal.py # 启动终端项目
+git clone https://github.com/jihe520/MathModelAgent.git # 克隆项目
 ```
 
-运行的结果在`/project/work_dir/`目录下
+启动后端
 
-## 🤝 贡献
+```bash
+cd backend # 切换到 backend 目录下
+pip install uv # 推荐使用 uv 管理 python 项目
+uv sync # 安装依赖
+# 启动后端
+ENV=DEV uvicorn app.main:app --host 0.0.0.0 --port 8000 --ws-ping-interval 60 --ws-ping-timeout 120
+```
 
-- 项目处于**开发阶段**（我有时间就会更新），变更较多，还存在许多 Bug，我正着手修复。
-- 欢迎提交 issues 和 PRs
+启动前端
+
+```bash
+cd frontend # 切换到 frontend 目录下
+pnpm i #确保电脑安装了 pnpm
+pnpm run dev
+```
+
+
+运行的结果和产生在`backend/project/work_dir/xxx/*`目录下
+- notebook.ipynb: 保存运行过程中产生的代码
+- res.md: 保存最后运行产生的结果为 markdown 格式，使用 markdown 转 word(研究下 pandoc)
+
+## 🤝 贡献和开发
+
+- 项目处于**开发实验阶段**（我有时间就会更新），变更较多，还存在许多 Bug，我正着手修复。
+- 希望大家一起参与，让这个项目变得更好
+- 非常欢迎使用和提交  **PRs** 和 issues 
 - 需求参考 后期计划
+
+clone 项目后，下载 **Todo Tree** 插件，可以查看代码中所有具体位置的 todo
+
+`.cursor/*` 有项目整体架构、rules、mcp 可以方便开发使用
 
 ## 📄 版权License
 
-请勿商业用途，商业用途联系我（作者）
+个人免费使用，请勿商业用途，商业用途联系我（作者）
 
 ## 🙏 Reference
 
@@ -101,5 +146,6 @@ Thanks to the following projects:
 [danmo-tyc](https://github.com/danmo-tyc)
 
 有问题可以进群问
+[QQ 群：699970403](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=rFKquDTSxKcWpEhRgpJD-dPhTtqLwJ9r&authKey=xYKvCFG5My4uYZTbIIoV5MIPQedW7hYzf0%2Fbs4EUZ100UegQWcQ8xEEgTczHsyU6&noverify=0&group_code=699970403)
 
 <img src="./docs/qq.jpg" height="400px">
