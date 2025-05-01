@@ -1,64 +1,86 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { marked } from 'marked';
+import { onMounted, ref, watch, computed } from 'vue';
+import { renderMarkdown } from '@/utils/markdown';
+import type { WriterMessage } from '@/utils/response'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface ContentSection {
   id: number;
   content: string;
   renderedContent: string;
+  sub_title?: string;
 }
+
+const props = defineProps<{
+  messages: WriterMessage[]
+  writerSequence: string[]
+}>()
+
+
 
 const sections = ref<ContentSection[]>([]);
 let nextId = 0;
 
 // 添加新的内容段落
-const appendContent = async (content: string) => {
-  const renderedContent = await marked(content);
+const appendContent = async (content: string, sub_title?: string) => {
+  const renderedContent = await renderMarkdown(content);
   sections.value.push({
     id: nextId++,
     content,
-    renderedContent
+    renderedContent,
+    sub_title
   });
 };
 
-// 初始化示例内容
-onMounted(async () => {
-  // 模拟后端分段发送内容
-  await appendContent(`# 数学建模比赛论文`);
+// 根据 writerSequence 排序内容
+const sortedSections = computed(() => {
+  if (!props.writerSequence.length) return sections.value;
 
-  await appendContent(`## 摘要
-本文主要研究了...`);
+  return [...sections.value].sort((a, b) => {
+    const aIndex = a.sub_title ? props.writerSequence.indexOf(a.sub_title) : Infinity;
+    const bIndex = b.sub_title ? props.writerSequence.indexOf(b.sub_title) : Infinity;
 
-  await appendContent(`## 1. 问题重述
-### 1.1 背景介绍
-在当今快速发展的科技时代...`);
+    if (aIndex === Infinity && bIndex === Infinity) return 0;
+    if (aIndex === Infinity) return 1;
+    if (bIndex === Infinity) return -1;
 
-  await appendContent(`### 1.2 问题分析
-根据题目要求，我们需要解决以下关键问题：
-1. 第一个关键问题
-2. 第二个关键问题
-3. 第三个关键问题`);
+    return aIndex - bIndex;
+  });
 });
+
+// 监听消息变化
+watch(() => props.messages, async (messages) => {
+  // 清空现有内容
+  sections.value = [];
+  nextId = 0;
+
+  // 按顺序添加每个消息的内容
+  for (const msg of messages) {
+    if (msg.content) {
+      await appendContent(msg.content, msg.sub_title);
+    }
+  }
+}, { immediate: true });
 </script>
 
 <template>
-  <div class="h-full overflow-hidden bg-gray-50">
-    <div class="h-full overflow-y-auto p-6">
-      <div class="max-w-4xl mx-auto space-y-6">
-        <TransitionGroup name="section" tag="div" class="space-y-6">
-          <div v-for="section in sections" :key="section.id"
-            class="bg-white rounded-lg shadow-lg overflow-hidden transform transition-all duration-500">
-            <div class="p-6">
-              <div class="prose prose-slate max-w-none" v-html="section.renderedContent"></div>
-            </div>
+  <ScrollArea class="h-full overflow-y-auto p-6">
+    <div class="max-w-4xl mx-auto overflow-y-auto space-y-6">
+      <TransitionGroup name="section" tag="div" class="space-y-6">
+        <div v-for="section in sortedSections" :key="section.id"
+          class="bg-white rounded-lg shadow-lg transform transition-all duration-500">
+          <div class="p-6">
+            <div class="prose prose-slate max-w-none" v-html="section.renderedContent"></div>
           </div>
-        </TransitionGroup>
-      </div>
+        </div>
+      </TransitionGroup>
     </div>
-  </div>
+  </ScrollArea>
 </template>
 
 <style>
+@import 'katex/dist/katex.min.css';
+
 .section-enter-active,
 .section-leave-active {
   transition: all 0.5s ease;
@@ -115,15 +137,51 @@ onMounted(async () => {
 }
 
 .prose table {
-  @apply w-full border-collapse border border-gray-300 my-4;
+  @apply w-full border-collapse my-6 !border-2 !border-gray-400;
 }
 
-.prose th,
+.prose th {
+  @apply !bg-gray-200 p-3 text-left !font-bold !text-gray-900 !border !border-gray-400;
+}
+
 .prose td {
-  @apply border border-gray-300 p-2;
+  @apply p-3 !text-gray-900 !border !border-gray-400;
 }
 
-.prose thead {
-  @apply bg-gray-50;
+.prose tr {
+  @apply !border !border-gray-400;
+}
+
+.prose tr:nth-child(even) {
+  @apply !bg-gray-50;
+}
+
+.prose tr:hover {
+  @apply !bg-gray-100;
+}
+
+.prose code {
+  @apply bg-gray-100 px-1 py-0.5 rounded text-sm font-mono;
+}
+
+.prose pre {
+  @apply bg-gray-100 p-4 rounded-lg overflow-x-auto my-4;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0;
+}
+
+.prose .math-block {
+  @apply my-4 overflow-x-auto;
+  text-align: center;
+}
+
+.prose .katex-display {
+  @apply my-4 overflow-x-auto;
+}
+
+.prose .katex {
+  font-size: 1.1em;
 }
 </style>

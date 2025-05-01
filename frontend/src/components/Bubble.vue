@@ -28,7 +28,7 @@ const renderedContent = computed(() => {
     props.type === 'agent' && props.agentType === 'WriterAgent' ? 'bubble-writer' : '',
     props.class
   ]">
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 flex-1">
       <!-- 头像在上方 -->
       <span v-if="props.type === 'user'" class="text-2xl select-none mb-1">🧑</span>
       <span v-else-if="props.type === 'agent' && props.agentType === 'CoderAgent'"
@@ -105,10 +105,16 @@ const renderedContent = computed(() => {
 
 .prose pre {
   @apply p-2 my-1 rounded bg-black/10 dark:bg-white/10 overflow-x-auto;
+  max-width: 100%;
+  width: 100%;
 }
 
 .prose pre code {
   @apply bg-transparent p-0;
+  @apply overflow-y-auto;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .prose blockquote {
@@ -151,6 +157,7 @@ const renderedContent = computed(() => {
 
 .bubble {
   display: flex;
+  flex: 1 1 0%;
 }
 
 .bubble-user {
@@ -177,7 +184,6 @@ const renderedContent = computed(() => {
   /* 浅灰 */
   color: #0f172a;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
-  border: 1px solid #38bdf8;
 }
 
 /* WriterAgent 气泡颜色 */
@@ -186,6 +192,5 @@ const renderedContent = computed(() => {
   /* 浅黄 */
   color: #92400e;
   box-shadow: 0 2px 8px rgba(251, 191, 36, 0.08);
-  border: 1px solid #facc15;
 }
 </style>

@@ -6,7 +6,7 @@ from app.utils.log_util import logger
 from app.utils.redis_manager import redis_manager
 from app.schemas.request import Problem
 from app.schemas.response import AgentMessage, AgentType, Message, SystemMessage
-from app.utils.common_utils import create_task_id, create_work_dir
+from app.utils.common_utils import create_task_id, create_work_dir, get_config_template
 import os
 import asyncio
 from fastapi import HTTPException
@@ -81,6 +81,13 @@ async def modeling(
         run_modeling_task_async, task_id, ques_all, comp_template, format_output
     )
     return {"task_id": task_id, "status": "processing"}
+
+
+@router.get("/writer_seque")
+async def get_writer_seque():
+    # 返回论文顺序
+    config_template: dict = get_config_template(CompTemplate.CHINA)
+    return list(config_template.keys())
 
 
 async def run_modeling_task_async(

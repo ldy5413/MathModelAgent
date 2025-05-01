@@ -17,6 +17,9 @@ from app.utils.log_util import logger
 import asyncio
 from app.config.setting import settings
 import json
+import base64
+
+from app.utils.common_utils import get_current_files
 
 
 def delete_color_control_char(string):
@@ -72,7 +75,6 @@ class E2BCodeInterpreter:
                 logger.error(f"工作目录不存在: {self.work_dir}")
                 raise FileNotFoundError(f"工作目录不存在: {self.work_dir}")
 
-            # 只上传数据集文件
             files = [
                 f for f in os.listdir(self.work_dir) if f.endswith((".csv", ".xlsx"))
             ]
@@ -80,24 +82,16 @@ class E2BCodeInterpreter:
 
             for file in files:
                 file_path = os.path.join(self.work_dir, file)
-                logger.info(f"处理文件: {file_path}")
-
                 if os.path.isfile(file_path):
                     try:
                         with open(file_path, "rb") as f:
                             content = f.read()
-                            # 使用 files API 上传文件
+                            # 使用官方推荐的 files.write 方法
                             await self.sbx.files.write(f"/home/user/{file}", content)
                             logger.info(f"成功上传文件到沙箱: {file}")
                     except Exception as e:
                         logger.error(f"上传文件 {file} 失败: {str(e)}")
                         raise
-                else:
-                    logger.info(f"跳过目录: {file_path}")
-
-            # 验证上传的文件
-            uploaded_files = await self.sbx.files.list("/home/user")
-            logger.info(f"沙箱中的文件列表: {[f.name for f in uploaded_files]}")
 
         except Exception as e:
             logger.error(f"文件上传过程失败: {str(e)}")
@@ -112,7 +106,7 @@ class E2BCodeInterpreter:
         )
         await self.execute_code(init_code)
 
-    def _truncate_text(self, text: str, max_length: int = 5000) -> str:
+    def _truncate_text(self, text: str, max_length: int = 1000) -> str:
         """截断文本，保留开头和结尾的重要信息"""
         if len(text) <= max_length:
             return text
@@ -261,6 +255,7 @@ class E2BCodeInterpreter:
                             msg=result._repr_javascript_(),
                         )
                     )
+
                     # 处理主要结果
                 # if result.is_main_result and result.text:
                 #     result_text = self._truncate_text(result.text)
@@ -275,20 +270,35 @@ class E2BCodeInterpreter:
         for item in content_to_display:
             if isinstance(item, dict):
                 if item.get("type") in ["stdout", "stderr", "error"]:
-                    text_to_gpt.append(item.get("content") or item.get("value") or "")
+                    text_to_gpt.append(
+                        self._truncate_text(
+                            item.get("content") or item.get("value") or ""
+                        )
+                    )
             elif isinstance(item, ResultModel):
                 if item.format in ["text", "html", "markdown", "json"]:
-                    text_to_gpt.append(f"[{item.format}]\n{item.msg}")
+                    text_to_gpt.append(
+                        self._truncate_text(f"[{item.format}]\n{item.msg}")
+                    )
                 elif item.format in ["png", "jpeg", "svg", "pdf"]:
                     text_to_gpt.append(
                         f"[{item.format} 图片已生成，内容为 base64，未展示]"
                     )
 
+        logger.info(f"text_to_gpt: {text_to_gpt}")
+
+        combined_text = "\n".join(text_to_gpt)
+
+        # 在代码执行完成后，立即同步文件
+        try:
+            await self.download_all_files_from_sandbox()
+            logger.info("文件同步完成")
+        except Exception as e:
+            logger.error(f"文件同步失败: {str(e)}")
+
         # 保存到分段内容
         ## TODO: Base64 等图像需要优化
         await self._push_to_websocket(content_to_display)
-
-        combined_text = "\n".join(text_to_gpt)
 
         return (
             combined_text,
@@ -302,6 +312,7 @@ class E2BCodeInterpreter:
         agent_msg = CoderMessage(
             agent_type=AgentType.CODER,
             code_results=content_to_display,
+            files=get_current_files(self.work_dir, "all"),
         )
         logger.debug(f"发送消息: {agent_msg.model_dump_json()}")
         await redis_manager.publish_message(
@@ -312,6 +323,7 @@ class E2BCodeInterpreter:
     async def get_created_images(self, section: str) -> list[str]:
         """获取当前 section 创建的图片列表"""
         if not self.sbx:
+            logger.warning("沙箱环境未初始化")
             return []
 
         try:
@@ -324,6 +336,7 @@ class E2BCodeInterpreter:
             self.created_images = list(
                 set(self.section_output[section]["images"]) - set(self.created_images)
             )
+            logger.info(f"{section}-获取创建的图片列表: {self.created_images}")
             return self.created_images
         except Exception as e:
             logger.error(f"获取创建的图片列表失败: {str(e)}")
@@ -346,36 +359,70 @@ class E2BCodeInterpreter:
 
     async def cleanup(self):
         """清理资源并关闭沙箱"""
-
-        if not await self.sbx.is_running():
-            logger.warning("沙箱已经关闭了")
-
         try:
             if self.sbx:
-                ## TODO: 生成一个文件，下载一份文件
-                await self.download_all_files_from_sandbox()
-                await self.sbx.kill()
-                logger.info("成功关闭沙箱环境")
+                if await self.sbx.is_running():
+                    try:
+                        await self.download_all_files_from_sandbox()
+                    except Exception as e:
+                        logger.error(f"下载文件失败: {str(e)}")
+                    finally:
+                        await self.sbx.kill()
+                        logger.info("成功关闭沙箱环境")
+                else:
+                    logger.warning("沙箱已经关闭，跳过清理步骤")
         except Exception as e:
             logger.error(f"清理沙箱环境失败: {str(e)}")
-            raise
+            # 这里可以选择不抛出异常，因为这是清理步骤
 
     async def download_all_files_from_sandbox(self) -> None:
-        """从沙箱中下载所有文件"""
+        """从沙箱中下载所有文件并与本地同步"""
         try:
-            files = await self.sbx.files.list("/home/user")
-            for file in files:
-                content = await self.sbx.files.read(file.path)
-                output_path = os.path.join(self.work_dir, file.name)
-                # 修复：确保写入文件时 content 一定是 bytes 类型
-                if isinstance(content, str):
-                    content = content.encode("utf-8")
-                with open(output_path, "wb") as f:
-                    f.write(content)
-                logger.info(f"成功下载文件: {file.name}")
+            # 获取沙箱中的文件列表
+            sandbox_files = await self.sbx.files.list("/home/user")
+            sandbox_files_dict = {f.name: f for f in sandbox_files}
+
+            # 获取本地文件列表
+            local_files = set()
+            if os.path.exists(self.work_dir):
+                local_files = set(os.listdir(self.work_dir))
+
+            # 下载新文件或更新已修改的文件
+            for file in sandbox_files:
+                try:
+                    # 排除 .bash_logout、.bashrc 和 .profile 文件
+                    if file.name in [".bash_logout", ".bashrc", ".profile"]:
+                        continue
+
+                    local_path = os.path.join(self.work_dir, file.name)
+                    should_download = True
+
+                    # 检查文件是否需要更新
+                    if file.name in local_files:
+                        # 这里可以添加文件修改时间或内容哈希的比较
+                        # 暂时简单处理，有同名文件就更新
+                        pass
+
+                    if should_download:
+                        # 使用 bytes 格式读取文件内容，确保正确处理二进制数据
+                        content = await self.sbx.files.read(file.path, format="bytes")
+
+                        # 确保目标目录存在
+                        os.makedirs(self.work_dir, exist_ok=True)
+
+                        # 写入文件
+                        with open(local_path, "wb") as f:
+                            f.write(content)
+                        logger.info(f"同步文件: {file.name}")
+
+                except Exception as e:
+                    logger.error(f"同步文件 {file.name} 失败: {str(e)}")
+                    continue
+
+            logger.info("文件同步完成")
+
         except Exception as e:
-            logger.error(f"下载文件失败: {str(e)}")
-            # 这里不再 raise，防止 cleanup 阶段因沙箱已关闭而报错
+            logger.error(f"文件同步失败: {str(e)}")
 
     async def shutdown_sandbox(self):
         """关闭沙箱环境"""

@@ -6,13 +6,19 @@ from uuid import uuid4
 
 class Message(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    msg_type: Literal["system", "agent"] | None  # system msg | agent messsage
+    msg_type: Literal[
+        "system", "agent", "user"
+    ]  # system msg | agent message | user message
     content: str | None = None
 
 
 class SystemMessage(Message):
     msg_type: str = "system"
     type: Literal["info", "warning", "success", "error"] = "info"
+
+
+class UserMessage(Message):
+    msg_type: str = "user"
 
 
 class AgentMessage(Message):
@@ -56,7 +62,7 @@ class ErrorModel(CodeExecution):
     traceback: str
 
 
-# 总返回类型
+# 代码执行结果类型
 OutputItem = Union[StdOutModel, StdErrModel, ResultModel, ErrorModel]
 
 
@@ -66,7 +72,13 @@ class CoderMessage(AgentMessage):
     agent_type: AgentType = AgentType.CODER
     code: str | None = None
     code_results: list[OutputItem] | None = None
+    files: list[str] | None = None
 
 
 class WriterMessage(AgentMessage):
     agent_type: AgentType = AgentType.WRITER
+    sub_title: str | None = None
+
+
+# 所有可能的消息类型
+MessageType = Union[SystemMessage, UserMessage, CoderMessage, WriterMessage]

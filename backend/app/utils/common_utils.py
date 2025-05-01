@@ -2,9 +2,9 @@ import os
 import datetime
 import hashlib
 import tomllib
-from app.core.llm import LLM
 from app.utils.enums import CompTemplate
 from app.utils.log_util import logger
+import re
 
 
 def create_task_id() -> str:
@@ -38,7 +38,8 @@ def get_work_dir(task_id: str) -> str:
         raise FileNotFoundError(f"工作目录不存在: {work_dir}")
 
 
-def get_config_template(comp_template: CompTemplate) -> dict:
+#  TODO: 是不是应该将 Prompt 写成一个 class
+def get_config_template(comp_template: CompTemplate = CompTemplate.CHINA) -> dict:
     if comp_template == CompTemplate.CHINA:
         return load_toml(os.path.join("app", "config", "md_template.toml"))
 
@@ -72,7 +73,7 @@ def get_current_files(folder_path: str, type: str = "all") -> list[str]:
         ]
 
 
-def simple_chat(model: LLM, history: list) -> str:
+def simple_chat(model, history: list) -> str:
     """
     Description of the function.
 
@@ -92,3 +93,13 @@ def simple_chat(model: LLM, history: list) -> str:
     completion = model.client.chat.completions.create(**kwargs)
 
     return completion.choices[0].message.content
+
+
+# 判断content是否包含图片 xx.png,对其处理为    ![filename](http://localhost:8000/static/20250428-200915-ebc154d4/filename.jpg)
+def transform_link(task_id: str, content: str):
+    content = re.sub(
+        r"!\[(.*?)\]\((.*?\.(?:png|jpg|jpeg|gif|bmp|webp))\)",
+        lambda match: f"![{match.group(1)}](http://localhost:8000/static/{task_id}/{match.group(2)})",
+        content,
+    )
+    return content
