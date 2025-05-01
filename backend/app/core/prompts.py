@@ -77,9 +77,9 @@ def get_writer_prompt(
         
         1. 当你输入图像引用时候，使用![image_name](image_name.png)
         2. 你不需要输出markdown的这个```markdown格式，只需要输出markdown的内容，
-        3. Latex公式使用$$ $$包裹
+        3. Latex公式使用$$ $$包裹 
         4. 严格按照参考用户输入的格式模板以及**正确的编号顺序**
-        5. 不需要询问用户
+        5. 不需要询问用户 
         6. 当提到图片时，请使用提供的图片列表中的文件名
         """
 

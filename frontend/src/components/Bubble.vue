@@ -184,7 +184,6 @@ const renderedContent = computed(() => {
   /* 浅灰 */
   color: #0f172a;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
-  border: 1px solid #38bdf8;
 }
 
 /* WriterAgent 气泡颜色 */
@@ -193,6 +192,5 @@ const renderedContent = computed(() => {
   /* 浅黄 */
   color: #92400e;
   box-shadow: 0 2px 8px rgba(251, 191, 36, 0.08);
-  border: 1px solid #facc15;
 }
 </style>

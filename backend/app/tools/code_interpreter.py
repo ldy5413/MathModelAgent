@@ -75,7 +75,6 @@ class E2BCodeInterpreter:
                 logger.error(f"工作目录不存在: {self.work_dir}")
                 raise FileNotFoundError(f"工作目录不存在: {self.work_dir}")
 
-            # 只上传数据集文件
             files = [
                 f for f in os.listdir(self.work_dir) if f.endswith((".csv", ".xlsx"))
             ]
@@ -83,24 +82,16 @@ class E2BCodeInterpreter:
 
             for file in files:
                 file_path = os.path.join(self.work_dir, file)
-                logger.info(f"处理文件: {file_path}")
-
                 if os.path.isfile(file_path):
                     try:
                         with open(file_path, "rb") as f:
                             content = f.read()
-                            # 使用 files API 上传文件
+                            # 使用官方推荐的 files.write 方法
                             await self.sbx.files.write(f"/home/user/{file}", content)
                             logger.info(f"成功上传文件到沙箱: {file}")
                     except Exception as e:
                         logger.error(f"上传文件 {file} 失败: {str(e)}")
                         raise
-                else:
-                    logger.info(f"跳过目录: {file_path}")
-
-            # 验证上传的文件
-            uploaded_files = await self.sbx.files.list("/home/user")
-            logger.info(f"沙箱中的文件列表: {[f.name for f in uploaded_files]}")
 
         except Exception as e:
             logger.error(f"文件上传过程失败: {str(e)}")

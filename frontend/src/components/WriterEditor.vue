@@ -137,16 +137,27 @@ watch(() => props.messages, async (messages) => {
 }
 
 .prose table {
-  @apply w-full border-collapse border border-gray-800;
-}
-
-.prose th,
-.prose td {
-  @apply border border-gray-800 p-1 text-center;
+  @apply w-full border-collapse my-6 !border-2 !border-gray-400;
 }
 
 .prose th {
-  @apply font-bold text-gray-900 text-center;
+  @apply !bg-gray-200 p-3 text-left !font-bold !text-gray-900 !border !border-gray-400;
+}
+
+.prose td {
+  @apply p-3 !text-gray-900 !border !border-gray-400;
+}
+
+.prose tr {
+  @apply !border !border-gray-400;
+}
+
+.prose tr:nth-child(even) {
+  @apply !bg-gray-50;
+}
+
+.prose tr:hover {
+  @apply !bg-gray-100;
 }
 
 .prose code {

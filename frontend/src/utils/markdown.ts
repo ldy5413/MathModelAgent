@@ -40,25 +40,14 @@ const renderer: Partial<RendererObject> = {
     })
 
     // 处理块级公式（使用 $$ 包裹）
-    if (text.startsWith('$$') && text.endsWith('$$')) {
-      const tex = text.slice(2, -2).trim()
-      return `<div class="math-block">${renderMath(tex, true)}</div>`
-    }
+    const blockMathPattern = /\$\$([\s\S]*?)\$\$/g
+    text = text.replace(blockMathPattern, (_, tex) => {
+      return `<div class="math-block">${renderMath(tex.trim(), true)}</div>`
+    })
 
-    // 处理行内公式（使用 $ 包裹）
-    text = text.replace(/\$(.*?)\$/g, (_, tex) => renderMath(tex.trim(), false))
+    // 处理行内公式（使用 \( \) 包裹）
+    text = text.replace(/\\\((.*?)\\\)/g, (_, tex) => renderMath(tex.trim(), false))
     
-    // 处理带括号的公式，确保不是已经处理过的
-    if (!text.includes('class="katex"')) {
-      text = text.replace(/\((.*?)\)/g, (match, tex) => {
-        // 检查是否是数学公式（包含数学符号）
-        if (/[+\-*/=^_{}\\]/.test(tex)) {
-          return renderMath(tex.trim(), false)
-        }
-        return match // 如果不是数学公式，保持原样
-      })
-    }
-
     // 还原图片占位符
     text = text.replace(/__IMAGE_PLACEHOLDER_(\d+)__/g, (_, index) => {
       const [, alt, src] = images[parseInt(index)]

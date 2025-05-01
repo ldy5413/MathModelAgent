@@ -23,7 +23,7 @@ const sendMessage = () => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col p-3 bg-gray-50">
+  <div class="flex h-full flex-col p-3">
     <div ref="scrollRef" class="flex-1 overflow-y-auto">
       <template v-for="message in props.messages" :key="message.id">
         <div class="mb-3">

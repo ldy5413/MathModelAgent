@@ -21,6 +21,7 @@ import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { useTaskStore } from '@/stores/task'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getWriterSeque } from '@/apis/commonApi';
+import { Button } from '@/components/ui/button';
 
 const props = defineProps<{ task_id: string }>()
 const taskStore = useTaskStore()
@@ -52,8 +53,8 @@ onBeforeUnmount(() => {
       <ResizablePanel :default-size="70" class="h-full min-w-0">
         <div class="flex h-full flex-col min-w-0">
           <Tabs default-value="coder" class="w-full h-full flex flex-col">
-            <div class="border-b px-4 py-1">
-              <TabsList class="justify-center">
+            <div class="border-b px-4 py-1 flex justify-between">
+              <TabsList class="">
                 <TabsTrigger value="coder" class="text-sm">
                   CoderAgent
                 </TabsTrigger>
@@ -62,6 +63,9 @@ onBeforeUnmount(() => {
                 </TabsTrigger>
               </TabsList>
               <!--  TODO: 其他选项 -->
+              <Button @click="taskStore.downloadMessages" class="flex justify-end">
+                下载消息
+              </Button>
             </div>
 
             <TabsContent value="coder" class="h-full p-1 flex-1 overflow-auto">
@@ -83,10 +87,7 @@ onBeforeUnmount(() => {
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>
-    <button @click="taskStore.downloadMessages"
-      class="absolute top-2 right-2 z-10 bg-blue-500 text-white px-3 py-1 rounded">
-      下载消息
-    </button>
+
   </div>
 </template>
 
