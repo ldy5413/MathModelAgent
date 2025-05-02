@@ -115,6 +115,9 @@ Results and outputs are generated in the `backend/project/work_dir/xxx/*` direct
 
 ## 🤝 Contribution & Development
 
+[DeepWiki](https://deepwiki.com/jihe520/MathModelAgent)
+
+
 - The project is in **experimental development stage** (updated when I have time), with frequent changes and some bugs being fixed.
 - Everyone is welcome to participate and make the project better.
 - PRs and issues are very welcome.

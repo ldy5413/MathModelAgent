@@ -118,6 +118,8 @@ pnpm run dev
 
 ## 🤝 贡献和开发
 
+[DeepWiki](https://deepwiki.com/jihe520/MathModelAgent)
+
 - 项目处于**开发实验阶段**（我有时间就会更新），变更较多，还存在许多 Bug，我正着手修复。
 - 希望大家一起参与，让这个项目变得更好
 - 非常欢迎使用和提交  **PRs** 和 issues 
