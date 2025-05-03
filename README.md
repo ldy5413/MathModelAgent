@@ -100,7 +100,10 @@ cd backend # 切换到 backend 目录下
 pip install uv # 推荐使用 uv 管理 python 项目
 uv sync # 安装依赖
 # 启动后端
+# MacOS or Linux 运行这条命令
 ENV=DEV uvicorn app.main:app --host 0.0.0.0 --port 8000 --ws-ping-interval 60 --ws-ping-timeout 120
+# Windows 运行这条命令
+set ENV=DEV && uvicorn app.main:app --host 0.0.0.0 --port 8000 --ws-ping-interval 60 --ws-ping-timeout 120
 ```
 
 启动前端
