@@ -138,7 +138,7 @@ Thanks to the following projects:
 - [TaskWeaver](https://github.com/microsoft/TaskWeaver)
 - [Code-Interpreter](https://github.com/MrGreyfun/Local-Code-Interpreter/tree/main)
 - [Latex](https://github.com/Veni222987/MathModelingLatexTemplate/tree/main)
-
+- [Agent Laboratory](https://github.com/SamuelSchmidgall/AgentLaboratory)
 
 ## 其他
 

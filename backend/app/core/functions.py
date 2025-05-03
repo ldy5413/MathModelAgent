@@ -20,3 +20,9 @@ tools = [
         },
     },
 ]
+
+# TODO: pip install python
+
+# TODO: read files
+
+# TODO: get_cites

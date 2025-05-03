@@ -66,7 +66,9 @@ class RedisManager:
         try:
             message_json = message.model_dump_json()
             await client.publish(channel, message_json)
-            logger.debug(f"消息已发布到频道 {channel}: {message_json}")
+            logger.debug(
+                f"消息已发布到频道 {channel}:mes_type:{message.msg_type}:msg_content:{message.content}"
+            )
             # 保存消息到文件
             await self._save_message_to_file(task_id, message)
         except Exception as e:

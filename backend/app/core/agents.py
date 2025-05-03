@@ -108,6 +108,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
 
         # 如果是第一次运行，则添加系统提示
         if self.is_first_run:
+            logger.info("首次运行，添加系统提示和数据集文件信息")
             self.is_first_run = False
             self.append_chat_history({"role": "system", "content": self.system_prompt})
             # 当前数据集文件
@@ -118,6 +119,8 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                 }
             )
 
+        # 添加 sub_task
+        logger.info(f"添加子任务提示: {prompt}")
         self.append_chat_history({"role": "user", "content": prompt})
 
         retry_count = 0
@@ -125,15 +128,17 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         task_completed = False
 
         if self.current_chat_turns >= self.max_chat_turns:
+            logger.error(f"超过最大聊天次数: {self.max_chat_turns}")
             await redis_manager.publish_message(
                 self.task_id,
-                SystemMessage(content="超过最大思考次数", type="error"),
+                SystemMessage(content="超过最大聊天次数", type="error"),
             )
             raise Exception(
                 f"Reached maximum number of chat turns ({self.max_chat_turns}). Task incomplete."
             )
 
         if retry_count >= self.max_retries:
+            logger.error(f"超过最大尝试次数: {self.max_retries}")
             await redis_manager.publish_message(
                 self.task_id,
                 SystemMessage(content="超过最大尝试次数", type="error"),
@@ -149,6 +154,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
             and self.current_chat_turns < self.max_chat_turns
         ):
             self.current_chat_turns += 1
+            logger.info(f"当前对话轮次: {self.current_chat_turns}")
             response = await self.model.chat(
                 history=self.chat_history,
                 tools=tools,
@@ -156,14 +162,17 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                 agent_name=self.__class__.__name__,
             )
 
+            # 如果有工具调用
             if (
                 hasattr(response.choices[0].message, "tool_calls")
                 and response.choices[0].message.tool_calls
             ):
+                logger.info("检测到工具调用")
                 tool_call = response.choices[0].message.tool_calls[0]
                 tool_id = tool_call.id
                 # TODO: json JSON解析时遇到了无效的转义字符
                 if tool_call.function.name == "execute_code":
+                    logger.info(f"调用工具: {tool_call.function.name}")
                     await redis_manager.publish_message(
                         self.task_id,
                         SystemMessage(
@@ -191,7 +200,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                     )
 
                     # 执行工具调用
-                    logger.warning("执行工具调用")
+                    logger.info("执行工具调用")
                     (
                         text_to_gpt,
                         error_occurred,
@@ -208,11 +217,11 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                             "tool_call_id": tool_id,
                         }
                     )
-
+                    # 代码执行错误
                     if error_occurred:
-                        logger.warning("代码执行错误")
-
+                        logger.warning(f"代码执行错误: {error_message}")
                         retry_count += 1
+                        logger.info(f"当前尝试次:{retry_count} / {self.max_retries}")
                         last_error_message = error_message
                         reflection_prompt = get_reflection_prompt(error_message, code)
 
@@ -224,12 +233,16 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                         self.append_chat_history(
                             {"role": "user", "content": reflection_prompt}
                         )
+                        # 如果代码出错，返回重新开始
                         continue
 
                     # 检查任务完成情况时也计入对话轮次
                     self.current_chat_turns += 1
+                    logger.info(
+                        f"当前对话轮次: {self.current_chat_turns} / {self.max_chat_turns}"
+                    )
                     # 使用所有执行结果生成检查提示
-                    logger.warning("判断是否完成")
+                    logger.info("判断是否完成")
 
                     completion_check_prompt = get_completion_check_prompt(
                         prompt, text_to_gpt
@@ -252,14 +265,18 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                         hasattr(completion_response.choices[0].message, "tool_calls")
                         and completion_response.choices[0].message.tool_calls
                     ):
-                        logger.warning("没有调用工具，代表已经完成了")
+                        logger.info("没有调用工具，代表任务已完成")
                         task_completed = True
                         return completion_response.choices[0].message.content
+            else:
+                logger.info("没有工具，代表任务完成")
 
             if retry_count >= self.max_retries:
+                logger.error(f"超过最大尝试次数: {self.max_retries}")
                 return f"Failed to complete task after {self.max_retries} attempts. Last error: {last_error_message}"
 
             if self.current_chat_turns >= self.max_chat_turns:
+                logger.error(f"超过最大对话轮次: {self.max_chat_turns}")
                 return f"Reached maximum number of chat turns ({self.max_chat_turns}). Task incomplete."
 
         logger.info(f"{self.__class__.__name__}:完成:执行子任务: {subtask_title}")
@@ -270,6 +287,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
 # 长文本
 # TODO: 并行 parallel
 # TODO: 获取当前文件下的文件
+# TODO: 引用cites tool
 class WriterAgent(Agent):  # 同样继承自Agent类
     def __init__(
         self,
