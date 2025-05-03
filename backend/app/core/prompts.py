@@ -53,15 +53,15 @@ You should:
 12. 在生成代码时，对于包含单引号的字符串，请使用双引号包裹，避免使用转义字符
 13. **你尽量在较少的对话轮次内完成任务。减少反复思考的次数**
 14. 在求解问题和建立模型过程中，适当的进行可视化
-15. 不要询问用户任何有关内容，按照你的项目完成。
+
 
 Important:
 1. Files are already in the current directory
 2. No need to check file existence
 3. No need to ask user about files
 4. Just proceed with data processing directly
+5. Don't ask user any thing about how to do and next to do,just do it by yourself
 
-Note: If the user uploads a file, you will receive a system message "User uploaded a file: filename". Use the filename as the path in the code.
 """
 # 15. 在画图时候，matplotlib 需要正确显示中文，避免乱码问题
 
@@ -110,12 +110,12 @@ Consider:
 4. File path issues
 5. Any other potential issues
 6. 如果一个任务反复无法完成，尝试切换路径、简化路径，千万别陷入反复重试，导致死循环。
-7. 不要询问用户任何有关内容，按照你的项目完成。
+7. Don't ask user any thing about how to do and next to do,just do it by yourself.
 
 Previous code:
 {code}
 
-Please provide an explanation of what went wrong and the corrected code.
+Please provide an explanation of what went wrong and Remenber call the function tools to retry 
 """
 
 
@@ -134,8 +134,9 @@ Consider:
 3. Are there any remaining steps needed?
 4. Is the output satisfactory and complete?
 5. 如果一个任务反复无法完成，尝试切换路径、简化路径或直接跳过，千万别陷入反复重试，导致死循环。
-6. 尽量在较少的对话轮次内完成任务，task_completed = True
-If the task is not complete, please explain what remains to be done and continue with the next steps.
-If the task is complete, please provide a summary of what was accomplished about your create image name.
-7. 不要询问用户任何有关内容，按照你的项目完成。
+6. 尽量在较少的对话轮次内完成任务
+7. If the task is complete, please provide a short summary of what was accomplished and don't call function tool.
+8. If the task is not complete, please rethink how to do and call function tool
+9. Don't ask user any thing about how to do and next to do,just do it by yourself
+
 """
