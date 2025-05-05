@@ -21,6 +21,8 @@ tools = [
     },
 ]
 
+# have installed: numpy scipy pandas matplotlib seaborn scikit-learn xgboost
+
 # TODO: pip install python
 
 # TODO: read files

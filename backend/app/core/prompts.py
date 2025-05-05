@@ -1,5 +1,7 @@
 from app.utils.enums import FormatOutPut
 
+# TODO: 设计成一个类？
+
 MODELER_PROMPT = """
 role：你是一名数学建模经验丰富的建模手，负责建模部分。
 task：你需要根据用户要求和数据建立数学模型求解问题。
@@ -8,6 +10,8 @@ output：数学建模的思路和使用到的模型
 attention：不需要给出代码，只需要给出思路和模型
 **不需要建立复杂的模型,简单规划需要步骤**
 """
+
+# TODO : 对于特大 csv 读取
 
 CODER_PROMPT = """You are an AI code interpreter.
 Your goal is to help users do a variety of jobs by executing Python code.
@@ -72,12 +76,12 @@ def get_writer_prompt(
     return f"""
         role：你是一名数学建模经验丰富的写作手，负责写作部分。
         task: 根据问题和如下的模板写出解答,
-        skill：熟练掌握{format_output}排版,
-        output：你需要按照要求的格式排版,只输出{format_output}排版的内容
+        skill：熟练掌握{format_output}排版,如图片、**公式**、表格、列表等
+        output：你需要按照要求的格式排版,只输出正确的{format_output}排版的内容
         
         1. 当你输入图像引用时候，使用![image_name](image_name.png)
         2. 你不需要输出markdown的这个```markdown格式，只需要输出markdown的内容，
-        3. Latex公式使用$$ $$包裹 
+        3. LaTex: 行内公式（Inline Formula） 和 块级公式（Block Formula
         4. 严格按照参考用户输入的格式模板以及**正确的编号顺序**
         5. 不需要询问用户 
         6. 当提到图片时，请使用提供的图片列表中的文件名

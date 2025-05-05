@@ -31,7 +31,7 @@ async def config():
     }
 
 
-@router.post("/modeling/")
+@router.post("/modeling")
 async def modeling(
     background_tasks: BackgroundTasks,
     ques_all: str = Form(...),  # 从表单获取

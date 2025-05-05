@@ -20,38 +20,28 @@ import json
 import base64
 
 from app.utils.common_utils import get_current_files
+from app.tools.base_interpreter import BaseCodeInterpreter
 
 
-def delete_color_control_char(string):
-    ansi_escape = re.compile(r"(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]")
-    return ansi_escape.sub("", string)
-
-
-class E2BCodeInterpreter:
+class E2BCodeInterpreter(BaseCodeInterpreter):
     def __init__(
         self,
-        workd_dir: str,
         task_id: str,
+        work_dir: str,
         notebook_serializer: NotebookSerializer,
     ):
-        self.work_dir = workd_dir
+        super().__init__(task_id, work_dir, notebook_serializer)
         self.sbx = None
-        self.task_id = task_id
-        self.notebook_serializer = notebook_serializer
-        self.section_output: dict[str, dict[str, list[str]]] = {}
-        self.created_images: list[str] = []
 
     @classmethod
     async def create(
         cls,
-        workd_dir: str,
         task_id: str,
+        work_dir: str,
         notebook_serializer: NotebookSerializer,
-        timeout,
     ) -> "E2BCodeInterpreter":
         """创建并初始化 E2BCodeInterpreter 实例"""
-        instance = cls(workd_dir, task_id, notebook_serializer)
-        await instance.initialize(timeout=timeout)
+        instance = cls(task_id, work_dir, notebook_serializer)
         return instance
 
     async def initialize(self, timeout: int = 3000):
@@ -106,14 +96,6 @@ class E2BCodeInterpreter:
         )
         await self.execute_code(init_code)
 
-    def _truncate_text(self, text: str, max_length: int = 1000) -> str:
-        """截断文本，保留开头和结尾的重要信息"""
-        if len(text) <= max_length:
-            return text
-
-        half_length = max_length // 2
-        return text[:half_length] + "\n... (内容已截断) ...\n" + text[-half_length:]
-
     async def execute_code(self, code: str) -> tuple[str, bool, str]:
         """执行代码并返回结果"""
 
@@ -148,7 +130,7 @@ class E2BCodeInterpreter:
             error_message = f"Error: {execution.error.name}: {execution.error.value}\n{execution.error.traceback}"
             error_message = self._truncate_text(error_message)
             logger.error(f"执行错误: {error_message}")
-            text_to_gpt.append(delete_color_control_char(error_message))
+            text_to_gpt.append(self.delete_color_control_char(error_message))
             content_to_display.append(
                 ErrorModel(
                     name=execution.error.name,
@@ -306,20 +288,6 @@ class E2BCodeInterpreter:
             error_message,
         )
 
-    async def _push_to_websocket(self, content_to_display: list[OutputItem] | None):
-        logger.info("执行结果已推送到WebSocket")
-
-        agent_msg = CoderMessage(
-            agent_type=AgentType.CODER,
-            code_results=content_to_display,
-            files=get_current_files(self.work_dir, "all"),
-        )
-        logger.debug(f"发送消息: {agent_msg.model_dump_json()}")
-        await redis_manager.publish_message(
-            self.task_id,
-            agent_msg,
-        )
-
     async def get_created_images(self, section: str) -> list[str]:
         """获取当前 section 创建的图片列表"""
         if not self.sbx:
@@ -341,21 +309,6 @@ class E2BCodeInterpreter:
         except Exception as e:
             logger.error(f"获取创建的图片列表失败: {str(e)}")
             return []
-
-    def add_section(self, section_name: str) -> None:
-        """确保添加的section结构正确"""
-
-        if section_name not in self.section_output:
-            self.section_output[section_name] = {"content": [], "images": []}
-
-    def add_content(self, section: str, text: str) -> None:
-        """向指定section添加文本内容"""
-        self.add_section(section)
-        self.section_output[section]["content"].append(text)
-
-    def get_code_output(self, section: str) -> str:
-        """获取指定section的代码输出"""
-        return "\n".join(self.section_output[section]["content"])
 
     async def cleanup(self):
         """清理资源并关闭沙箱"""
@@ -423,19 +376,3 @@ class E2BCodeInterpreter:
 
         except Exception as e:
             logger.error(f"文件同步失败: {str(e)}")
-
-    async def shutdown_sandbox(self):
-        """关闭沙箱环境"""
-        logger.info("关闭沙箱环境")
-        await self.cleanup()
-
-    async def get_current_all_files_from_sandbox(self) -> list:
-        return await self.sbx.files.list("/home/user")
-
-    def __del__(self):
-        """析构函数，确保资源被正确清理"""
-        try:
-            if hasattr(self, "sbx") and self.sbx:
-                asyncio.create_task(self.cleanup())
-        except Exception as e:
-            logger.error(f"析构函数中清理资源失败: {str(e)}")
