@@ -1,7 +1,7 @@
 from pydantic import AnyUrl, BeforeValidator, computed_field, field_validator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
-from typing import Annotated
+from typing import Annotated, Optional
 
 
 def parse_cors(value: str) -> list[str]:
@@ -22,14 +22,18 @@ class Settings(BaseSettings):
     DEEPSEEK_BASE_URL: str
     MAX_CHAT_TURNS: int
     MAX_RETRIES: int
-    E2B_API_KEY: str
+    E2B_API_KEY: Optional[str] = None
     LOG_LEVEL: str
     DEBUG: bool
     REDIS_URL: str
     REDIS_MAX_CONNECTIONS: int
     CORS_ALLOW_ORIGINS: Annotated[list[str] | str, BeforeValidator(parse_cors)]
 
-    model_config = SettingsConfigDict(env_file=".env.dev", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env.dev",
+        env_file_encoding="utf-8",
+        extra="allow",
+    )
 
     def get_deepseek_config(self) -> dict:
         return {

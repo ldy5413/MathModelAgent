@@ -41,7 +41,7 @@
 - [ ] 更多测试案例
 - [ ] docker 部署
 - [ ] 引入用户的交互（选择模型，重写等等）
-- [ ] codeinterpreter 接入云端 如 e2b 等供应商..
+- [x] codeinterpreter 接入云端 如 e2b 等供应商..
 - [ ] 多语言: R 语言, matlab
 - [ ] 绘图 napki,draw.io
 
@@ -64,7 +64,7 @@
 
 ```bash
 ENV=dev
-#兼容 OpenAI 格式都行，具体看官方文档
+# 兼容 OpenAI 格式都行，具体看官方文档
 DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=
 DEEPSEEK_BASE_URL=
@@ -72,8 +72,6 @@ DEEPSEEK_BASE_URL=
 MAX_CHAT_TURNS=60
 # 思考反思次数
 MAX_RETRIES=5
-# https://e2b.dev/ 
-E2B_API_KEY=
 
 LOG_LEVEL=DEBUG
 DEBUG=true

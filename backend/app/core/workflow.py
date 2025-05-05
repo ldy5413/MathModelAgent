@@ -7,11 +7,12 @@ from app.utils.log_util import logger
 from app.utils.common_utils import create_work_dir, simple_chat, get_config_template
 from app.models.user_output import UserOutput
 from app.config.setting import settings
+from app.tools.interpreter_factory import create_interpreter
 from app.core.llm import DeepSeekModel
-from app.tools.code_interpreter import E2BCodeInterpreter
 import json
 from app.utils.redis_manager import redis_manager
 from app.utils.notebook_serializer import NotebookSerializer
+from app.tools.base_interpreter import BaseCodeInterpreter
 
 
 class WorkFlow:
@@ -58,9 +59,10 @@ class MathModelWorkFlow(WorkFlow):
             SystemMessage(content="正在创建代码沙盒环境"),
         )
 
-        e2b_code_interpreter = await E2BCodeInterpreter.create(
-            workd_dir=self.work_dir,
+        code_interpreter = await create_interpreter(
+            kind="local",
             task_id=self.task_id,
+            work_dir=self.work_dir,
             notebook_serializer=notebook_serializer,
             timeout=3000,
         )
@@ -81,7 +83,7 @@ class MathModelWorkFlow(WorkFlow):
             work_dir=self.work_dir,
             max_chat_turns=settings.MAX_CHAT_TURNS,
             max_retries=settings.MAX_RETRIES,
-            code_interpreter=e2b_code_interpreter,
+            code_interpreter=code_interpreter,
         )
 
         ################################################ solution steps
@@ -106,7 +108,7 @@ class MathModelWorkFlow(WorkFlow):
 
             # TODO: 是否可以不需要coder_response
             writer_prompt = self.get_writer_prompt(
-                key, coder_response, e2b_code_interpreter, config_template
+                key, coder_response, code_interpreter, config_template
             )
 
             await redis_manager.publish_message(
@@ -125,7 +127,7 @@ class MathModelWorkFlow(WorkFlow):
             ## TODO: 图片引用错误
             writer_response = await writer_agent.run(
                 writer_prompt,
-                available_images=await e2b_code_interpreter.get_created_images(key),
+                available_images=await code_interpreter.get_created_images(key),
                 sub_title=key,
             )
 
@@ -138,7 +140,7 @@ class MathModelWorkFlow(WorkFlow):
 
         # 关闭沙盒
 
-        await e2b_code_interpreter.shutdown_sandbox()
+        await code_interpreter.cleanup()
         logger.info(user_output.get_res())
 
         ################################################ write steps
@@ -223,7 +225,7 @@ class MathModelWorkFlow(WorkFlow):
         self,
         key: str,
         coder_response: str,
-        code_interpreter: E2BCodeInterpreter,
+        code_interpreter: BaseCodeInterpreter,
         config_template: dict,
     ) -> str:
         """根据不同的key生成对应的writer_prompt

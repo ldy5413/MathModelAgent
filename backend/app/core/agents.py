@@ -13,10 +13,10 @@ from app.models.user_output import UserOutput
 from app.utils.enums import CompTemplate, FormatOutPut
 from app.utils.log_util import logger
 from app.config.setting import settings
-from app.tools.code_interpreter import E2BCodeInterpreter
 from app.utils.common_utils import get_current_files
 from app.utils.redis_manager import redis_manager
 from app.schemas.response import SystemMessage
+from app.tools.base_interpreter import BaseCodeInterpreter
 
 
 class Agent:
@@ -93,7 +93,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         work_dir: str,  # 工作目录
         max_chat_turns: int = settings.MAX_CHAT_TURNS,  # 最大聊天次数
         max_retries: int = settings.MAX_RETRIES,  # 最大反思次数
-        code_interpreter: E2BCodeInterpreter = None,
+        code_interpreter: BaseCodeInterpreter = None,
     ) -> None:
         super().__init__(task_id, model, max_chat_turns)
         self.work_dir = work_dir
