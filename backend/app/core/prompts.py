@@ -101,7 +101,6 @@ df['\\u5a74\\u513f\\u884c\\u4e3a\\u7279\\u5f81']  # No unicode escapes
 1. Primary: Seaborn (Nature/Science style)
 2. Secondary: Matplotlib
 3. Always:
-   - Handle Chinese characters properly
    - Set semantic filenames (e.g., "feature_correlation.png")
    - Save figures to working directory
    - Include model evaluation printouts

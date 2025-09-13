@@ -3,6 +3,9 @@ from app.tools.notebook_serializer import NotebookSerializer
 import jupyter_client
 from app.utils.log_util import logger
 import os
+import re
+import asyncio
+import shutil
 from app.services.redis_manager import redis_manager
 from app.schemas.response import (
     OutputItem,
@@ -22,6 +25,8 @@ class LocalCodeInterpreter(BaseCodeInterpreter):
         super().__init__(task_id, work_dir, notebook_serializer)
         self.km, self.kc = None, None
         self.interrupt_signal = False
+        # 防止同一缺失模块反复安装造成死循环
+        self._auto_install_tried: set[str] = set()
 
     async def initialize(self):
         # 本地内核一般不需异步上传文件，直接切换目录即可
@@ -96,6 +101,33 @@ class LocalCodeInterpreter(BaseCodeInterpreter):
         # 执行 Python 代码
         logger.info("开始在本地执行代码...")
         execution = self.execute_code_(code)
+
+        # 若检测到缺失模块或 pip 安装失败，尝试自动安装后重试一次
+        missing_mod = self._extract_missing_module(execution)
+        pip_failed_pkg = None if missing_mod else self._extract_pkg_from_calledprocesserror(execution)
+        target_pkg = missing_mod or pip_failed_pkg
+        if target_pkg and target_pkg not in self._auto_install_tried:
+            self._auto_install_tried.add(target_pkg)
+            pkg_name = self._map_import_to_package(target_pkg)
+            await redis_manager.publish_message(
+                self.task_id,
+                SystemMessage(content=f"检测到缺失依赖触发: {target_pkg}，尝试安装包: {pkg_name}"),
+            )
+            ok, install_log = await self._auto_install(pkg_name)
+            if ok:
+                logger.info(f"自动安装 {pkg_name} 成功，重试执行代码")
+                await redis_manager.publish_message(
+                    self.task_id,
+                    SystemMessage(content=f"已安装 {pkg_name}，正在重试执行代码"),
+                )
+                # 覆盖之前的执行结果，进入正常处理流程
+                execution = self.execute_code_(code)
+            else:
+                logger.error(f"自动安装 {pkg_name} 失败: {install_log}")
+                await redis_manager.publish_message(
+                    self.task_id,
+                    SystemMessage(content=f"自动安装 {pkg_name} 失败\n{install_log}", type="error"),
+                )
         logger.info("代码执行完成，开始处理结果...")
 
         await redis_manager.publish_message(
@@ -155,6 +187,75 @@ class LocalCodeInterpreter(BaseCodeInterpreter):
             error_occurred,
             error_message,
         )
+
+    def _extract_missing_module(self, execution: list[tuple[str, str]]) -> str | None:
+        """从执行结果中解析 ModuleNotFoundError 缺失模块名"""
+        for mark, out_str in execution:
+            if mark == "error":
+                # 常见形式: ModuleNotFoundError: No module named 'networkx'
+                m = re.search(r"ModuleNotFoundError: No module named ['\"]?([A-Za-z0-9_\.\-]+)['\"]?", out_str)
+                if m:
+                    return m.group(1)
+        return None
+
+    def _map_import_to_package(self, import_name: str) -> str:
+        """将 import 名映射到 pip/uv 包名（常见别名修正）"""
+        mapping = {
+            "sklearn": "scikit-learn",
+            "PIL": "Pillow",
+            "yaml": "PyYAML",
+            "bs4": "beautifulsoup4",
+            "cv2": "opencv-python",
+            "Crypto": "pycryptodome",
+            "dateutil": "python-dateutil",
+            "torchvision": "torchvision",
+            "torch": "torch",
+        }
+        return mapping.get(import_name, import_name)
+
+    def _extract_pkg_from_calledprocesserror(self, execution: list[tuple[str, str]]) -> str | None:
+        """从 CalledProcessError 日志中解析出 pip install 的目标包名（最佳努力）。"""
+        pat = re.compile(r"pip', 'install', '([^']+)'")
+        for mark, out_str in execution:
+            if mark == "error":
+                m = pat.search(out_str)
+                if m:
+                    return m.group(1)
+        return None
+
+    async def _auto_install(self, pkg_name: str) -> tuple[bool, str]:
+        """优先通过 uv 安装，失败则尝试在内核中使用 pip 安装"""
+        # 尝试 uv 安装
+        if shutil.which("uv"):
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "uv", "pip", "install", pkg_name,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                out, err = await proc.communicate()
+                if proc.returncode == 0:
+                    return True, (out or b"").decode("utf-8", "ignore")
+                else:
+                    uv_log = ((out or b"") + (err or b"")).decode("utf-8", "ignore")
+                    logger.warning(f"uv 安装失败，转内核 pip：{uv_log}")
+            except Exception as e:
+                logger.warning(f"调用 uv 失败：{e}")
+
+        # 回退：在内核中执行 pip 安装，确保与内核环境一致
+        install_code = (
+            "import sys, subprocess\n"
+            f"print('Installing {pkg_name} via pip in kernel...')\n"
+            f"subprocess.check_call([sys.executable, '-m', 'pip', 'install', '{pkg_name}'])\n"
+            f"print('Installed {pkg_name}')\n"
+        )
+        result = self.execute_code_(install_code)
+        # 只要没有 error 标记即视为成功
+        for mark, out_str in result:
+            if mark == "error":
+                return False, out_str
+        log = "\n".join(f"{m}: {s}" for m, s in result)
+        return True, log
 
     def execute_code_(self, code) -> list[tuple[str, str]]:
         msg_id = self.kc.execute(code)
