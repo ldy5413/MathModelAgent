@@ -90,23 +90,43 @@ class Flows:
         """
         code_output = code_interpreter.get_code_output(key)
 
-        questions_quesx_keys = self.get_questions_quesx_keys()
-        bgc = self.questions["background"]
-        quesx_writer_prompt = {
-            key: f"""
-                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{config_template[key]}
-                """
-            for key in questions_quesx_keys
-        }
+        questions_map = self.get_questions_quesx()
+        bgc = self.questions.get("background", "")
+
+        # 针对各节添加更强的“分节约束”，避免 EDA/问题内容混写
+        quesx_writer_prompt = {}
+        for ques_key, ques_text in questions_map.items():
+            quesx_writer_prompt[ques_key] = (
+                f"你正在撰写小节：{ques_key}。\n"
+                f"对应问题原文：{ques_text}\n"
+                f"素材：\n- 代码手结果：{coder_response}\n- 运行输出节选：{code_output}\n\n"
+                "写作要求：\n"
+                "- 仅撰写该小节的‘模型的建立与求解’内容；严禁插入 EDA/描述性统计/数据清洗等内容。\n"
+                "- 不要出现‘数据概览/缺失值/分布可视化/箱线图/直方图/相关系数热力图’等 EDA 关键词。\n"
+                "- 必须围绕问题进行建模思路、公式/方法、求解与结果解读，最后明确回答该问题。\n"
+                "- 输出纯 Markdown 文本，不要包含代码块或工具调用。\n\n"
+                f"请严格按如下模板排版：\n{config_template[ques_key]}"
+            )
 
         writer_prompt = {
-            "eda": f"""
-                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{config_template["eda"]}
-                """,
+            "eda": (
+                f"你正在撰写小节：eda（4.2 描述性统计）。\n"
+                f"素材：\n- 问题背景：{bgc}\n- 代码手结果：{coder_response}\n- 运行输出节选：{code_output}\n\n"
+                "写作要求：\n"
+                "- 仅进行 EDA/描述性统计，不涉及任何‘模型建立与求解/回答问题’内容。\n"
+                "- 允许描述数据清洗、缺失值、分布与可视化结论。\n"
+                "- 输出纯 Markdown 文本。\n\n"
+                f"请严格按如下模板排版：\n{config_template['eda']}"
+            ),
             **quesx_writer_prompt,
-            "sensitivity_analysis": f"""
-                    问题背景{bgc},不需要编写代码,代码手得到的结果{coder_response},{code_output},按照如下模板撰写：{config_template["sensitivity_analysis"]}
-                """,
+            "sensitivity_analysis": (
+                f"你正在撰写小节：sensitivity_analysis（灵敏度分析）。\n"
+                f"素材：\n- 代码手结果：{coder_response}\n- 运行输出节选：{code_output}\n\n"
+                "写作要求：\n"
+                "- 讨论参数扰动对模型结论的影响，不写 EDA。\n"
+                "- 输出纯 Markdown 文本。\n\n"
+                f"请严格按如下模板排版：\n{config_template['sensitivity_analysis']}"
+            ),
         }
 
         if key in writer_prompt:

@@ -180,6 +180,12 @@ def get_writer_prompt(
         4. Language consistency with user input (currently English)
         5. **NEVER repeat citations**: Each unique reference content must appear only once in the entire document
         
+        # Section Discipline
+        - Only write the section explicitly requested in the user prompt.
+        - For EDA sections: focus on descriptive statistics and data quality; do not include modeling/solving content.
+        - For quesN sections: focus on model building, methods, solving steps and answers; do not include EDA/cleaning.
+        - If the provided materials are insufficient, write a concise, honest explanation and proceed with best-effort reasoning — but still respect the section scope.
+        
         # Exception Handling
         Automatic tool invocation triggers:
         1. Theoretical sections requiring references → search_papers
