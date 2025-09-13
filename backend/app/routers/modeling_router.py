@@ -243,12 +243,31 @@ async def run_modeling_task_async(
 ):
     logger.info(f"run modeling task for task_id: {task_id}")
 
-    problem = Problem(
-        task_id=task_id,
-        ques_all=ques_all,
-        comp_template=comp_template,
-        format_output=format_output,
-    )
+    # 在任务开始前自动校验四个 Agent 的模型配置
+    async def _validate_single(name: str, api_key: str | None, model_id: str | None, base_url: str | None) -> str | None:
+        if not model_id or model_id.strip() == "":
+            return f"{name}: 模型未配置"
+        try:
+            await litellm.acompletion(
+                model=model_id,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=1,
+                api_key=api_key or None,
+                base_url=base_url if base_url and base_url != "https://api.openai.com/v1" else None,
+            )
+            return None
+        except Exception as e:
+            return f"{name}: 验证失败 - {str(e)[:200]}"
+
+    async def _validate_all() -> list[str]:
+        tasks = [
+            _validate_single("Coordinator", settings.COORDINATOR_API_KEY, settings.COORDINATOR_MODEL, settings.COORDINATOR_BASE_URL),
+            _validate_single("Modeler", settings.MODELER_API_KEY, settings.MODELER_MODEL, settings.MODELER_BASE_URL),
+            _validate_single("Coder", settings.CODER_API_KEY, settings.CODER_MODEL, settings.CODER_BASE_URL),
+            _validate_single("Writer", settings.WRITER_API_KEY, settings.WRITER_MODEL, settings.WRITER_BASE_URL),
+        ]
+        results = await asyncio.gather(*tasks)
+        return [r for r in results if r]
 
     # 发送任务开始状态
     await redis_manager.publish_message(
@@ -258,6 +277,29 @@ async def run_modeling_task_async(
 
     # 给一个短暂的延迟，确保 WebSocket 有机会连接
     await asyncio.sleep(1)
+
+    # 执行验证
+    validation_errors = await _validate_all()
+    if validation_errors:
+        msg = "\n".join(validation_errors)
+        await redis_manager.publish_message(
+            task_id,
+            SystemMessage(content=f"模型配置验证失败:\n{msg}", type="error"),
+        )
+        logger.error(f"模型配置验证失败: {msg}")
+        return
+    else:
+        await redis_manager.publish_message(
+            task_id,
+            SystemMessage(content="模型配置验证成功"),
+        )
+
+    problem = Problem(
+        task_id=task_id,
+        ques_all=ques_all,
+        comp_template=comp_template,
+        format_output=format_output,
+    )
 
     # 创建任务并等待它完成
     task = asyncio.create_task(MathModelWorkFlow().execute(problem))
