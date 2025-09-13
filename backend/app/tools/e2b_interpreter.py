@@ -59,7 +59,9 @@ class E2BCodeInterpreter(BaseCodeInterpreter):
                 raise FileNotFoundError(f"工作目录不存在: {self.work_dir}")
 
             files = [
-                f for f in os.listdir(self.work_dir) if f.endswith((".csv", ".xlsx"))
+                f
+                for f in os.listdir(self.work_dir)
+                if f.endswith((".csv", ".xlsx", ".ttf", ".ttc", ".otf"))
             ]
             logger.info(f"工作目录中的文件列表: {files}")
 
@@ -69,8 +71,11 @@ class E2BCodeInterpreter(BaseCodeInterpreter):
                     try:
                         with open(file_path, "rb") as f:
                             content = f.read()
-                            # 使用官方推荐的 files.write 方法
-                            await self.sbx.files.write(f"/home/user/{file}", content)
+                            # 将文件上传到用户目录；字体文件放入 /home/user/fonts
+                            dst_path = (
+                                f"/home/user/fonts/{file}" if file.lower().endswith((".ttf", ".ttc", ".otf")) else f"/home/user/{file}"
+                            )
+                            await self.sbx.files.write(dst_path, content)
                             logger.info(f"成功上传文件到沙箱: {file}")
                     except Exception as e:
                         logger.error(f"上传文件 {file} 失败: {str(e)}")
@@ -82,10 +87,36 @@ class E2BCodeInterpreter(BaseCodeInterpreter):
 
     async def _pre_execute_code(self):
         init_code = (
+            "import os\n"
+            "import matplotlib as mpl\n"
             "import matplotlib.pyplot as plt\n"
-            # "plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial Unicode MS']\n"
-            # "plt.rcParams['axes.unicode_minus'] = False\n"
-            # "plt.rcParams['font.family'] = 'sans-serif'\n"
+            "from matplotlib import font_manager as fm\n"
+            "_font_files = [\n"
+            "  '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',\n"
+            "  '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',\n"
+            "  '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',\n"
+            "  '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',\n"
+            "]\n"
+            "for _f in _font_files:\n"
+            "    try:\n"
+            "        if os.path.exists(_f):\n"
+            "            fm.fontManager.addfont(_f)\n"
+            "    except Exception:\n"
+            "        pass\n"
+            "# 同时扫描 /home/user/fonts 目录下由我们上传的字体\n"
+            "_user_font_dir = '/home/user/fonts'\n"
+            "if os.path.isdir(_user_font_dir):\n"
+            "    for _root, _dirs, _files in os.walk(_user_font_dir):\n"
+            "        for _fn in _files:\n"
+            "            if _fn.lower().endswith(('.ttf', '.ttc', '.otf')):\n"
+            "                _p = os.path.join(_root, _fn)\n"
+            "                try:\n"
+            "                    fm.fontManager.addfont(_p)\n"
+            "                except Exception:\n"
+            "                    pass\n"
+            "plt.rcParams['font.sans-serif'] = ['Noto Sans CJK SC', 'WenQuanYi Zen Hei', 'WenQuanYi Micro Hei', 'SimHei', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'DejaVu Sans', 'sans-serif']\n"
+            "plt.rcParams['font.family'] = 'sans-serif'\n"
+            "plt.rcParams['axes.unicode_minus'] = False\n"
         )
         await self.execute_code(init_code)
 

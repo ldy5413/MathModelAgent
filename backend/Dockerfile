@@ -6,6 +6,21 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
+# 安装中文字体与字体配置，解决 matplotlib 中文乱码
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        fonts-noto-cjk \
+        fonts-wqy-zenhei \
+        fonts-wqy-microhei \
+        fontconfig \
+    && fc-cache -f -v \
+    && rm -rf /var/lib/apt/lists/*
+
+# 预设 UTF-8 环境，避免编码问题
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    MPLCONFIGDIR=/tmp/matplotlib
+
 # 先复制依赖文件，利用 Docker 层缓存
 COPY pyproject.toml uv.lock ./
 
