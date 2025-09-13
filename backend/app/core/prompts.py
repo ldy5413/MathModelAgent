@@ -45,7 +45,6 @@ attention：不需要给出代码，只需要给出思路和模型
 
 # 输出规范
 ## 字段约束
-{response_language}
 以 JSON 的形式输出输出的 JSON,需遵守以下的格式：
 ```json
 {
@@ -62,7 +61,7 @@ attention：不需要给出代码，只需要给出思路和模型
 - 严格保持单层JSON结构
 - 键值对值类型：字符串
 - 禁止嵌套/多级JSON
-""".format(response_language=response_language)
+""" + response_language
 
 
 CODER_PROMPT = f"""

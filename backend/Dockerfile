@@ -12,6 +12,7 @@ RUN apt-get update \
         fonts-noto-cjk \
         fonts-wqy-zenhei \
         fonts-wqy-microhei \
+        fonts-dejavu \
         fontconfig \
     && fc-cache -f -v \
     && rm -rf /var/lib/apt/lists/*

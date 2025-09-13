@@ -69,73 +69,143 @@ class WriterAgent(Agent):  # 同样继承自Agent类
 
         await self.append_chat_history({"role": "user", "content": prompt})
 
-        # 获取历史消息用于本次对话
-        response = await self.model.chat(
-            history=self.chat_history,
-            tools=writer_tools,
-            tool_choice="auto",
-            agent_name=self.__class__.__name__,
-            sub_title=sub_title,
-        )
-
+        # 工具循环：允许多次搜索，直到模型输出正文
+        max_tool_rounds = 3
         footnotes = []
 
-        if (
-            hasattr(response.choices[0].message, "tool_calls")
-            and response.choices[0].message.tool_calls
-        ):
-            logger.info("检测到工具调用")
-            tool_call = response.choices[0].message.tool_calls[0]
-            tool_id = tool_call.id
-            if tool_call.function.name == "search_papers":
-                logger.info("调用工具: search_papers")
+        def _looks_like_query_json(text: str) -> str | None:
+            """如果文本是 {"query": "..."} 结构，返回 query 文本，否则返回 None"""
+            try:
+                data = json.loads(text)
+                if isinstance(data, dict) and isinstance(data.get("query"), str):
+                    return data["query"].strip()
+            except Exception:
+                return None
+            return None
+
+        rounds = 0
+        while True:
+            # 获取历史消息用于本次对话
+            response = await self.model.chat(
+                history=self.chat_history,
+                tools=writer_tools,
+                tool_choice="auto",
+                agent_name=self.__class__.__name__,
+                sub_title=sub_title,
+            )
+
+            msg = response.choices[0].message
+
+            # 1) 如果模型通过 function calling 触发搜索
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                logger.info("检测到工具调用")
+                tool_call = msg.tool_calls[0]
+                tool_id = tool_call.id
+                if tool_call.function.name == "search_papers":
+                    logger.info("调用工具: search_papers")
+                    await redis_manager.publish_message(
+                        self.task_id,
+                        SystemMessage(content=f"写作手调用{tool_call.function.name}工具"),
+                    )
+
+                    query = json.loads(tool_call.function.arguments)["query"]
+
+                    await redis_manager.publish_message(
+                        self.task_id,
+                        WriterMessage(
+                            input={"query": query},
+                        ),
+                    )
+
+                    # 更新对话历史 - 添加助手的响应
+                    await self.append_chat_history(msg.model_dump())
+                    ic(msg.model_dump())
+
+                    try:
+                        papers = await self.scholar.search_papers(query)
+                    except Exception as e:
+                        error_msg = f"搜索文献失败: {str(e)}"
+                        logger.error(error_msg)
+                        return WriterResponse(
+                            response_content=error_msg, footnotes=footnotes
+                        )
+
+                    papers_str = self.scholar.papers_to_str(papers)
+                    logger.info(f"搜索文献结果\n{papers_str}")
+                    await self.append_chat_history(
+                        {
+                            "role": "tool",
+                            "content": papers_str,
+                            "tool_call_id": tool_id,
+                            "name": "search_papers",
+                        }
+                    )
+
+                    # 给出明确指令：使用上述结果写作，不要再输出查询 JSON
+                    follow_up = (
+                        "请基于上述文献结果撰写目标小节，输出纯 Markdown 文本；"
+                        "如果没有检索到合适文献，也请继续完成写作并保留占位说明。"
+                        "不要再输出 {\"query\": ...} 之类的 JSON；如需再次检索，请直接调用 search_papers 工具。"
+                    )
+                    await self.append_chat_history({"role": "user", "content": follow_up})
+
+                    rounds += 1
+                    if rounds >= max_tool_rounds:
+                        logger.info("达到最大工具交互轮次，停止继续检索")
+                        break
+                    # 继续下一轮
+                    continue
+
+            # 2) 未触发函数调用，可能直接输出正文，或输出 {"query": ...}
+            response_content = msg.content or ""
+            inferred_query = _looks_like_query_json(response_content)
+            if inferred_query and rounds < max_tool_rounds:
+                # 将其视为再次检索的意图
                 await redis_manager.publish_message(
                     self.task_id,
-                    SystemMessage(content=f"写作手调用{tool_call.function.name}工具"),
-                )
-
-                query = json.loads(tool_call.function.arguments)["query"]
-
-                await redis_manager.publish_message(
-                    self.task_id,
-                    WriterMessage(
-                        input={"query": query},
+                    SystemMessage(
+                        content="检测到写作手输出检索意图 JSON，自动触发 search_papers 并继续写作"
                     ),
                 )
 
-                # 更新对话历史 - 添加助手的响应
-                await self.append_chat_history(response.choices[0].message.model_dump())
-                ic(response.choices[0].message.model_dump())
+                # 把“JSON检索意图”作为助手消息加入历史，随后以工具响应的方式补充
+                await self.append_chat_history({
+                    "role": "assistant",
+                    "content": response_content,
+                })
 
                 try:
-                    papers = await self.scholar.search_papers(query)
+                    papers = await self.scholar.search_papers(inferred_query)
                 except Exception as e:
                     error_msg = f"搜索文献失败: {str(e)}"
                     logger.error(error_msg)
                     return WriterResponse(
                         response_content=error_msg, footnotes=footnotes
                     )
-                # TODO: pass to frontend
+
                 papers_str = self.scholar.papers_to_str(papers)
-                logger.info(f"搜索文献结果\n{papers_str}")
                 await self.append_chat_history(
                     {
                         "role": "tool",
                         "content": papers_str,
-                        "tool_call_id": tool_id,
+                        "tool_call_id": "inferred_query",
                         "name": "search_papers",
                     }
                 )
-                next_response = await self.model.chat(
-                    history=self.chat_history,
-                    tools=writer_tools,
-                    tool_choice="auto",
-                    agent_name=self.__class__.__name__,
-                    sub_title=sub_title,
+
+                follow_up = (
+                    "请基于上述文献结果撰写目标小节，输出纯 Markdown 文本；"
+                    "不要再输出 JSON；如需再次检索，请直接调用 search_papers 工具。"
                 )
-                response_content = next_response.choices[0].message.content
-        else:
-            response_content = response.choices[0].message.content
+                await self.append_chat_history({"role": "user", "content": follow_up})
+
+                rounds += 1
+                continue
+
+            # 3) 模型已输出正文
+            self.chat_history.append({"role": "assistant", "content": response_content})
+            logger.info(f"{self.__class__.__name__}:完成:执行对话")
+            return WriterResponse(response_content=response_content, footnotes=footnotes)
         self.chat_history.append({"role": "assistant", "content": response_content})
         logger.info(f"{self.__class__.__name__}:完成:执行对话")
         return WriterResponse(response_content=response_content, footnotes=footnotes)
