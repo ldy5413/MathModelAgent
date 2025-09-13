@@ -85,9 +85,11 @@ class LocalCodeInterpreter(BaseCodeInterpreter):
         self.execute_code_(init_code)
 
     async def execute_code(self, code: str) -> tuple[str, bool, str]:
-        logger.info(f"执行代码: {code}")
-        #  添加代码到notebook
-        self.notebook_serializer.add_code_cell_to_notebook(code)
+        # 在执行前，屏蔽/注释掉特定样式设置语句，避免影响全局绘图配置
+        code_to_run = self._comment_style_lines(code)
+        logger.info(f"执行代码(已处理样式语句): {code_to_run}")
+        #  添加代码到notebook（以处理后的代码为准）
+        self.notebook_serializer.add_code_cell_to_notebook(code_to_run)
 
         text_to_gpt: list[str] = []
         content_to_display: list[OutputItem] | None = []
@@ -100,7 +102,7 @@ class LocalCodeInterpreter(BaseCodeInterpreter):
         )
         # 执行 Python 代码
         logger.info("开始在本地执行代码...")
-        execution = self.execute_code_(code)
+        execution = self.execute_code_(code_to_run)
 
         # 若检测到缺失模块或 pip 安装失败，尝试自动安装后重试一次
         missing_mod = self._extract_missing_module(execution)
@@ -121,7 +123,7 @@ class LocalCodeInterpreter(BaseCodeInterpreter):
                     SystemMessage(content=f"已安装 {pkg_name}，正在重试执行代码"),
                 )
                 # 覆盖之前的执行结果，进入正常处理流程
-                execution = self.execute_code_(code)
+                execution = self.execute_code_(code_to_run)
             else:
                 logger.error(f"自动安装 {pkg_name} 失败: {install_log}")
                 await redis_manager.publish_message(
@@ -187,6 +189,83 @@ class LocalCodeInterpreter(BaseCodeInterpreter):
             error_occurred,
             error_message,
         )
+
+    def _comment_style_lines(self, code: str) -> str:
+        """将涉及全局样式/字体设置的代码行注释掉，避免执行。
+
+        处理范围（只对单行生效，必要时包含简单的多行调用拦截）：
+        - rcParams 任意访问/更新（plt/mpl/matplotlib 均拦截）
+        - seaborn 风格/主题：sns.set_style / sns.set_theme / sns.set_context / sns.set(
+        - matplotlib 样式：plt|mpl|matplotlib.style.use(
+        - 全局 rc 设置：plt|mpl|matplotlib.rc(
+        - rc 重置：plt|mpl|matplotlib.rcdefaults(
+        - 字体相关 API：font_manager / FontProperties / .addfont(
+        - 其它：包含 'font.'、'axes.unicode_minus'、'mathtext' 的 rc 相关改动
+
+        注：为尽量避免语法残缺导致的错误，对多行函数调用（如换行的 sns.set_theme(...)）
+        做了简单的括号匹配，命中首行后会持续注释到括号闭合。
+        """
+        # 直接匹配即注释（无条件触发）的关键词
+        hard_patterns = [
+            "rcParams",  # 覆盖所有 rcParams 改动（包含字体）
+            "sns.set_style",
+            "sns.set_theme",
+            "sns.set_context",
+            "sns.set(",
+            "plt.style.use",
+            "mpl.style.use",
+            "matplotlib.style.use",
+            "plt.rc(",
+            "mpl.rc(",
+            "matplotlib.rc(",
+            "plt.rcdefaults(",
+            "mpl.rcdefaults(",
+            "matplotlib.rcdefaults(",
+            "font_manager",  # matplotlib.font_manager / mpl.font_manager
+            "FontProperties",
+            ".addfont(",  # fm.addfont / font_manager.addfont
+            # 常见字体/数学文本/负号相关 rc
+            "axes.unicode_minus",
+            "mathtext",
+            "font.",  # 如 rcParams['font.sans-serif'] 等
+        ]
+
+        out_lines: list[str] = []
+        in_block = False
+        paren_balance = 0  # 追踪 (), {}, [] 的简单括号平衡
+
+        def balance_delta(s: str) -> int:
+            return s.count("(") - s.count(")") + s.count("[") - s.count("]") + s.count("{") - s.count("}")
+
+        for line in code.splitlines():
+            stripped = line.lstrip()
+            prefix = line[: len(line) - len(stripped)]  # 保留原缩进
+
+            if in_block:
+                # 持续注释直到括号平衡归零
+                out_lines.append(f"{prefix}# [blocked style] {stripped}")
+                paren_balance += balance_delta(line)
+                if paren_balance <= 0:
+                    in_block = False
+                continue
+
+            # 已是注释行则保留
+            if stripped.startswith("#"):
+                out_lines.append(line)
+                continue
+
+            # 命中关键词：注释该行，必要时进入多行阻断
+            if any(p in line for p in hard_patterns):
+                out_lines.append(f"{prefix}# [blocked style] {stripped}")
+                # 如果这是一类函数调用/可能多行，进入阻断并追踪括号
+                if any(tok in line for tok in ("(", "[", "{")) and balance_delta(line) > 0:
+                    in_block = True
+                    paren_balance = balance_delta(line)
+                continue
+
+            out_lines.append(line)
+
+        return "\n".join(out_lines)
 
     def _extract_missing_module(self, execution: list[tuple[str, str]]) -> str | None:
         """从执行结果中解析 ModuleNotFoundError 缺失模块名"""
