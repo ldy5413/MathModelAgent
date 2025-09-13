@@ -2,6 +2,8 @@ import json
 from app.utils.common_utils import transform_link, split_footnotes
 from app.utils.log_util import logger
 import time
+from types import SimpleNamespace
+import copy
 from app.schemas.response import (
     CoderMessage,
     WriterMessage,
@@ -17,6 +19,12 @@ from app.utils.track import agent_metrics
 from icecream import ic
 
 litellm.callbacks = [agent_metrics]
+# 兼容不同厂商（如 Gemini/Vertex）的 OpenAI 风格参数差异：
+# 自动丢弃对方不支持的参数，避免 4xx/5xx
+try:
+    litellm.drop_params = True
+except Exception:
+    pass
 
 
 class LLM:
@@ -73,15 +81,50 @@ class LLM:
         # TODO: stream 输出
         for attempt in range(max_retries):
             try:
-                # completion = self.client.chat.completions.create(**kwargs)
                 response = await acompletion(**kwargs)
                 logger.info(f"API返回: {response}")
                 if not response or not hasattr(response, "choices"):
                     raise ValueError("无效的API响应")
+
+                # 兼容上游偶发返回空 choices（例如 Gemini/Vertex 在特定参数/工具调用下）
+                if not response.choices:
+                    logger.warning("上游返回空 choices。若本次带有 tools，将去除 tools 重试一次。")
+                    if tools:
+                        retry_kwargs = copy.deepcopy(kwargs)
+                        retry_kwargs.pop("tools", None)
+                        retry_kwargs.pop("tool_choice", None)
+                        try:
+                            response2 = await acompletion(**retry_kwargs)
+                            logger.info(f"去工具后重试 API返回: {response2}")
+                            if hasattr(response2, "choices") and response2.choices:
+                                response = response2
+                            else:
+                                logger.warning("去工具后仍为空 choices，将返回占位空消息以避免崩溃。")
+                                response = SimpleNamespace(
+                                    choices=[
+                                        SimpleNamespace(
+                                            message=SimpleNamespace(content="")
+                                        )
+                                    ]
+                                )
+                        except Exception as _e:
+                            logger.error(f"去工具重试失败: {_e}")
+                            response = SimpleNamespace(
+                                choices=[
+                                    SimpleNamespace(
+                                        message=SimpleNamespace(content="")
+                                    )
+                                ]
+                            )
+                    else:
+                        response = SimpleNamespace(
+                            choices=[SimpleNamespace(message=SimpleNamespace(content=""))]
+                        )
+
                 self.chat_count += 1
                 await self.send_message(response, agent_name, sub_title)
                 return response
-            except (json.JSONDecodeError, litellm.InternalServerError) as e:
+            except (json.JSONDecodeError, litellm.InternalServerError, ValueError) as e:
                 logger.error(f"第{attempt + 1}次重试: {str(e)}")
                 if attempt < max_retries - 1:  # 如果不是最后一次尝试
                     time.sleep(retry_delay * (attempt + 1))  # 指数退避
@@ -187,7 +230,15 @@ class LLM:
 
     async def send_message(self, response, agent_name, sub_title=None):
         logger.info(f"subtitle是:{sub_title}")
-        content = response.choices[0].message.content
+        # 兼容空 choices 情况
+        content = ""
+        try:
+            if hasattr(response, "choices") and response.choices:
+                first = response.choices[0]
+                if hasattr(first, "message") and getattr(first.message, "content", None) is not None:
+                    content = first.message.content
+        except Exception:
+            pass
 
         match agent_name:
             case AgentType.CODER:
@@ -249,5 +300,10 @@ async def simple_chat(model: LLM, history: list) -> str:
         kwargs["base_url"] = model.base_url
 
     response = await acompletion(**kwargs)
-
-    return response.choices[0].message.content
+    # 容错：空 choices 则返回空串
+    try:
+        if hasattr(response, "choices") and response.choices:
+            return response.choices[0].message.content
+    except Exception:
+        pass
+    return ""

@@ -26,7 +26,7 @@ router = APIRouter()
 
 class ValidateApiKeyRequest(BaseModel):
     api_key: str
-    base_url: str = "https://api.openai.com/v1"
+    base_url: str
     model_id: str
 
 
@@ -94,16 +94,21 @@ async def validate_api_key(request: ValidateApiKeyRequest):
     验证 API Key 的有效性
     """
     try:
+        # 兼容厂商差异：自动丢弃不被该厂商接受的 OpenAI 风格参数
+        try:
+            litellm.drop_params = True
+        except Exception:
+            pass
         # 使用 litellm 发送测试请求
-        await litellm.acompletion(
-            model=request.model_id,
-            messages=[{"role": "user", "content": "Hi"}],
-            max_tokens=1,
-            api_key=request.api_key,
-            base_url=request.base_url
-            if request.base_url != "https://api.openai.com/v1"
-            else None,
-        )
+        kwargs = {
+            "api_key": request.api_key,
+            "messages": [{"role": "user", "content": "hi"}],
+            "model": request.model_id,
+        }
+        if request.base_url and request.base_url != "https://api.openai.com/v1":
+            kwargs["base_url"] = request.base_url
+        # logger.info(f"Validating API Key with params: {kwargs}")
+        await litellm.acompletion(**kwargs)
 
         return ValidateApiKeyResponse(valid=True, message="✓ 模型 API 验证成功")
     except Exception as e:
@@ -126,7 +131,7 @@ async def validate_api_key(request: ValidateApiKeyRequest):
             )
         else:
             return ValidateApiKeyResponse(
-                valid=False, message=f"✗ 验证失败: {error_msg[:50]}..."
+                valid=False, message=f"✗ 验证失败: {error_msg}"
             )
 
 
@@ -248,13 +253,15 @@ async def run_modeling_task_async(
         if not model_id or model_id.strip() == "":
             return f"{name}: 模型未配置"
         try:
-            await litellm.acompletion(
-                model=model_id,
-                messages=[{"role": "user", "content": "ping"}],
-                max_tokens=1,
-                api_key=api_key or None,
-                base_url=base_url if base_url and base_url != "https://api.openai.com/v1" else None,
-            )
+            kwargs = {
+                "api_key": api_key,
+                "messages": [{"role": "user", "content": "hi"}],
+                "model": model_id,
+            }
+            if base_url and base_url != "https://api.openai.com/v1":
+                kwargs["base_url"] = base_url
+            logger.info(f"{name} 验证参数: {kwargs}")
+            await litellm.acompletion(**kwargs)
             return None
         except Exception as e:
             return f"{name}: 验证失败 - {str(e)[:200]}"
