@@ -39,27 +39,38 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         self.code_interpreter = code_interpreter
 
     def _extract_code_block(self, text: str) -> str | None:
-        """从模型回复中提取 Python 代码块。
+        """从模型回复中提取代码块。
 
-        优先匹配 ```python/py ...```，其次回退到任意 ``` ... ```。
-        找到多个时取第一个。
+        - 优先收集所有 ```python/py ...``` 代码块
+        - 其次收集所有普通 ``` ... ``` 代码块
+        - 如找到多个，返回“最长”的那个代码块
         """
         if not text:
             return None
 
-        # 优先匹配显式标注为 python 的代码块
-        pattern_lang = re.compile(r"```\s*(?:python|py)\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
-        m = pattern_lang.search(text)
-        if m and m.group(1).strip():
-            return m.group(1).strip()
+        candidates: list[str] = []
 
-        # 回退匹配任意三引号代码块
+        # 收集显式标注为 python 的代码块
+        pattern_lang = re.compile(
+            r"```\s*(?:python|py)\s*\n(.*?)```", re.DOTALL | re.IGNORECASE
+        )
+        for m in pattern_lang.finditer(text):
+            code = (m.group(1) or "").strip()
+            if code:
+                candidates.append(code)
+
+        # 收集不带语言标注的三引号代码块
         pattern_any = re.compile(r"```\s*\n(.*?)```", re.DOTALL)
-        m = pattern_any.search(text)
-        if m and m.group(1).strip():
-            return m.group(1).strip()
+        for m in pattern_any.finditer(text):
+            code = (m.group(1) or "").strip()
+            if code:
+                candidates.append(code)
 
-        return None
+        if not candidates:
+            return None
+
+        # 返回最长的代码块
+        return max(candidates, key=len)
 
     async def run(self, prompt: str, subtask_title: str) -> CoderToWriter:
         logger.info(f"{self.__class__.__name__}:开始:执行子任务: {subtask_title}")
