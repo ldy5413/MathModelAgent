@@ -64,7 +64,11 @@ class MathModelWorkFlow(WorkFlow):
 
         modeler_agent = ModelerAgent(self.task_id, modeler_llm)
 
-        modeler_response = await modeler_agent.run(coordinator_response)
+        try:
+            modeler_response = await modeler_agent.run(coordinator_response)
+        except Exception as e:
+            logger.error(f"ModelerAgent 执行失败: {e}")
+            raise e
 
         user_output = UserOutput(work_dir=self.work_dir, ques_count=self.ques_count)
 

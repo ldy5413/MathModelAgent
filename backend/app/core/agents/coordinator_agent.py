@@ -1,10 +1,11 @@
 from app.core.agents.agent import Agent
 from app.core.llm.llm import LLM
-from app.core.prompts import COORDINATOR_PROMPT
+from app.core.prompts import COORDINATOR_PROMPT, FORMAT_QUESTIONS_PROMPT
 import json
 import re
 from app.utils.log_util import logger
 from app.schemas.A2A import CoordinatorToModeler
+from app.config.setting import settings
 
 
 class CoordinatorAgent(Agent):
@@ -18,7 +19,7 @@ class CoordinatorAgent(Agent):
         self.system_prompt = COORDINATOR_PROMPT
 
     async def run(self, ques_all: str) -> CoordinatorToModeler:
-        """用户输入问题 使用LLM 格式化 questions"""
+        """用户输入问题 使用LLM 格式化 questions（带自动重试与校验）"""
         await self.append_chat_history(
             {"role": "system", "content": self.system_prompt}
         )
