@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     MAX_CHAT_TURNS: int = 60
     MAX_RETRIES: int = 5
     E2B_API_KEY: Optional[str] = None
+    LANGUAGE: str = "zh"
     LOG_LEVEL: str = "DEBUG"
     DEBUG: bool = True
     REDIS_URL: str = "redis://redis:6379/0"

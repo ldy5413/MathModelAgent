@@ -1,6 +1,13 @@
 from app.schemas.enums import FormatOutPut
 import platform
-
+from app.config.setting import settings
+if settings.LANGUAGE == "zh":
+    response_language = "用中文回复"
+elif settings.LANGUAGE == "en":
+    response_language = "Respond in English"
+else:
+    print(f"Unsupported language setting: {settings.LANGUAGE}, defaulting to Chinese")
+    response_language = "用中文回复"    
 FORMAT_QUESTIONS_PROMPT = """
 用户将提供给你一段题目信息，**请你不要更改题目信息，完整将用户输入的内容**，以 JSON 的形式输出，输出的 JSON 需遵守以下的格式：
 
@@ -23,6 +30,7 @@ COORDINATOR_PROMPT = f"""
     {FORMAT_QUESTIONS_PROMPT}
     如果不是关于数学建模的，你将按照如下要求
     你会拒绝用户请求，输出一段拒绝的文字
+    {response_language}
 """
 
 
@@ -37,7 +45,7 @@ attention：不需要给出代码，只需要给出思路和模型
 
 # 输出规范
 ## 字段约束
-
+{response_language}
 以 JSON 的形式输出输出的 JSON,需遵守以下的格式：
 ```json
 {
@@ -54,13 +62,13 @@ attention：不需要给出代码，只需要给出思路和模型
 - 严格保持单层JSON结构
 - 键值对值类型：字符串
 - 禁止嵌套/多级JSON
-"""
+""".format(response_language=response_language)
 
 
 CODER_PROMPT = f"""
 You are an AI code interpreter specializing in data analysis with Python. Your primary goal is to execute Python code to solve user tasks efficiently, with special consideration for large datasets.
 
-中文回复
+{response_language}
 
 **Environment**: {platform.system()}
 **Key Skills**: pandas, numpy, seaborn, matplotlib, scikit-learn, xgboost, scipy
@@ -140,8 +148,8 @@ def get_writer_prompt(
     return f"""
         # Role Definition
         Professional writer for mathematical modeling competitions with expertise in technical documentation and literature synthesis
-        
-        中文回复
+
+        {response_language}
 
         # Core Tasks
         1. Compose competition papers using provided problem statements and solution content
