@@ -1,0 +1,47 @@
+# docker-compose.prod.yml
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: mathmodelagent_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mathmodelagent_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env.dev # 可按需改为 .env.prod
+    environment:
+      - ENV=DEV            # 可按需改为 PROD
+    # 仅保留生成文件目录为命名卷，移除源码映射
+    volumes:
+      - backend_work_dir:/app/project/work_dir
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mathmodelagent_frontend
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./frontend/.env.development # 可按需改为 .env.production
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  backend_work_dir:
+
