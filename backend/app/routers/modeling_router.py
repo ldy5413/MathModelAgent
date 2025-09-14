@@ -183,10 +183,18 @@ async def exampleModeling(
         "ques_all": ques_all,
         "comp_template": str(CompTemplate.CHINA.value if hasattr(CompTemplate.CHINA, 'value') else CompTemplate.CHINA),
         "format_output": str(FormatOutPut.Markdown.value if hasattr(FormatOutPut.Markdown, 'value') else FormatOutPut.Markdown),
+        # 明确记录作为输入数据的文件名，便于重置时保留
+        "data_files": list(current_files),
     }
     client = await redis_manager.get_client()
     await client.set(f"task:{task_id}:payload", pyjson.dumps(payload))
     await client.set(f"task:{task_id}:status", "created")
+    # 将 payload 也写入到工作目录，便于重置后仍能查看问题
+    try:
+        with open(os.path.join(work_dir, "payload.json"), "w", encoding="utf-8") as f:
+            f.write(pyjson.dumps(payload, ensure_ascii=False, indent=2))
+    except Exception:
+        pass
     await redis_manager.publish_message(task_id, SystemMessage(content="任务已创建，点击开始执行。"))
     return {"task_id": task_id, "status": "created"}
 
@@ -205,6 +213,7 @@ async def modeling(
     # 如果有上传文件，保存文件
     if files:
         logger.info(f"开始处理上传的文件，工作目录: {work_dir}")
+        saved_files: list[str] = []
         for file in files:
             try:
                 data_file_path = os.path.join(work_dir, file.filename)
@@ -223,6 +232,7 @@ async def modeling(
                 with open(data_file_path, "wb") as f:
                     f.write(content)
                 logger.info(f"成功保存文件: {data_file_path}")
+                saved_files.append(file.filename)
 
             except Exception as e:
                 logger.error(f"保存文件 {file.filename} 失败: {str(e)}")
@@ -238,10 +248,17 @@ async def modeling(
         "ques_all": ques_all,
         "comp_template": str(comp_template.value if hasattr(comp_template, 'value') else comp_template),
         "format_output": str(format_output.value if hasattr(format_output, 'value') else format_output),
+        "data_files": saved_files if files else [],
     }
     client = await redis_manager.get_client()
     await client.set(f"task:{task_id}:payload", pyjson.dumps(payload))
     await client.set(f"task:{task_id}:status", "created")
+    # 将 payload 也写入到工作目录，便于重置后仍能查看问题
+    try:
+        with open(os.path.join(work_dir, "payload.json"), "w", encoding="utf-8") as f:
+            f.write(pyjson.dumps(payload, ensure_ascii=False, indent=2))
+    except Exception:
+        pass
     await redis_manager.publish_message(task_id, SystemMessage(content="任务已创建，点击开始执行。"))
     return {"task_id": task_id, "status": "created"}
 
@@ -470,22 +487,64 @@ async def task_reset(task_id: str, auto_start: bool = True):
     # 停止运行中的任务
     task_registry.cancel(task_id)
 
-    # 清理工作目录
+    # 定向清理：根据 payload.json/redis 中记录的 data_files 保留输入文件，删除其余生成物
     from app.utils.common_utils import get_work_dir
     try:
         work_dir = get_work_dir(task_id)
     except Exception:
-        # 目录不存在也无所谓
         work_dir = None
-    if work_dir and os.path.isdir(work_dir):
-        try:
-            shutil.rmtree(work_dir)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"清理工作目录失败: {e}")
 
-    # 重新创建目录
-    from app.utils.common_utils import create_work_dir
-    create_work_dir(task_id)
+    if work_dir and os.path.isdir(work_dir):
+        keep_files = {"payload.json", "input_payload.json"}
+        # 从 Redis 或 payload.json 中读取 data_files
+        data_files: list[str] = []
+        try:
+            payload_raw = await (await redis_manager.get_client()).get(f"task:{task_id}:payload")
+            if payload_raw:
+                pd = pyjson.loads(payload_raw)
+                if isinstance(pd, dict) and isinstance(pd.get("data_files"), list):
+                    data_files = [str(x) for x in pd["data_files"]]
+        except Exception:
+            pass
+        if not data_files:
+            try:
+                pf = os.path.join(work_dir, "payload.json")
+                if os.path.isfile(pf):
+                    with open(pf, "r", encoding="utf-8") as f:
+                        pd = pyjson.loads(f.read())
+                    if isinstance(pd, dict) and isinstance(pd.get("data_files"), list):
+                        data_files = [str(x) for x in pd["data_files"]]
+            except Exception:
+                pass
+        # 归一化需要保留的绝对路径
+        keep_abs = set()
+        for n in data_files:
+            abs_path = os.path.normpath(os.path.join(work_dir, n))
+            keep_abs.add(abs_path)
+        # payload 文件也保留
+        keep_abs.add(os.path.normpath(os.path.join(work_dir, "payload.json")))
+        keep_abs.add(os.path.normpath(os.path.join(work_dir, "input_payload.json")))
+        try:
+            # 自底向上遍历，删除非保留文件并清理空目录
+            for root, dirs, files_in in os.walk(work_dir, topdown=False):
+                for fn in files_in:
+                    fp = os.path.normpath(os.path.join(root, fn))
+                    if fp in keep_abs:
+                        continue
+                    # 不删除 all.zip 会导致旧包混淆 → 允许删除
+                    try:
+                        os.remove(fp)
+                    except FileNotFoundError:
+                        pass
+                # 清理空目录（根目录除外）
+                if root != work_dir:
+                    try:
+                        if not os.listdir(root):
+                            shutil.rmtree(root, ignore_errors=True)
+                    except Exception:
+                        pass
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"清理生成文件失败: {e}")
 
     client = await redis_manager.get_client()
     await client.set(f"task:{task_id}:status", "created")
