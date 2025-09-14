@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from datetime import datetime
 from app.services.redis_manager import redis_manager
 from pathlib import Path
+import zipfile
 
 router = APIRouter()
 
@@ -18,20 +19,46 @@ async def get_download_url(task_id: str, filename: str):
 
 @router.get("/download_all_url")
 async def get_download_all_url(task_id: str):
+    # 打包工作目录下所有文件为 all.zip（排除 all.zip 自身）
+    work_dir = get_work_dir(task_id)
+    zip_path = os.path.join(work_dir, "all.zip")
+
+    try:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, _, files in os.walk(work_dir):
+                for fn in files:
+                    if fn == "all.zip":
+                        continue
+                    abs_path = os.path.join(root, fn)
+                    rel_path = os.path.relpath(abs_path, work_dir)
+                    zf.write(abs_path, rel_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"打包失败: {e}")
+
     return {"download_url": f"http://localhost:8000/static/{task_id}/all.zip"}
 
 
 @router.get("/files")
 async def get_files(task_id: str):
     work_dir = get_work_dir(task_id)
-    files = get_current_files(work_dir, "all")
-    file_all = []
-
-    for i in files:
-        file_type = i.split(".")[-1]
-        file_all.append({"filename": i, "file_type": file_type})
-
-    return file_all
+    entries = []
+    try:
+        for name in os.listdir(work_dir):
+            path = os.path.join(work_dir, name)
+            if os.path.isfile(path):
+                st = os.stat(path)
+                entries.append(
+                    {
+                        "name": name,
+                        "size": st.st_size,
+                        "modified_time": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                        "type": name.split(".")[-1].lower() if "." in name else "file",
+                    }
+                )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取文件失败: {e}")
+    entries.sort(key=lambda x: x["modified_time"], reverse=True)
+    return entries
 
 
 @router.get("/open_folder")

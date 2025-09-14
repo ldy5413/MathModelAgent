@@ -92,7 +92,7 @@ const loadFromStore = () => {
   form.value.openalex_email = apiKeyStore.openalexEmail
 }
 
-// 保存表单数据到 store
+// 保存表单数据到 store + 后端
 const saveToStore = async () => {
   // 先保存到前端 store
   apiKeyStore.setCoordinatorConfig(form.value.coordinator)
@@ -100,19 +100,17 @@ const saveToStore = async () => {
   apiKeyStore.setCoderConfig(form.value.coder)
   apiKeyStore.setWriterConfig(form.value.writer)
   apiKeyStore.setOpenalexEmail(form.value.openalex_email)
-  // 如果验证成功，也保存到后端设置
-  if (allValid.value) {
-    try {
-      await saveApiConfig({
-        coordinator: form.value.coordinator,
-        modeler: form.value.modeler,
-        coder: form.value.coder,
-        writer: form.value.writer,
-        openalex_email: form.value.openalex_email
-      })
-    } catch (error) {
-      console.error('保存配置到后端失败:', error)
-    }
+  // 总是保存到后端（不强制依赖“先验证”），以便立即生效
+  try {
+    await saveApiConfig({
+      coordinator: form.value.coordinator,
+      modeler: form.value.modeler,
+      coder: form.value.coder,
+      writer: form.value.writer,
+      openalex_email: form.value.openalex_email
+    })
+  } catch (error) {
+    console.error('保存配置到后端失败:', error)
   }
 }
 
@@ -261,7 +259,7 @@ const providers = {
   "OpenAI 兼容": {
     "url": "/",
     "key": "OpenAI 兼容",
-    "baseUrl": "basurl",
+    "baseUrl": "https://api.openai.com/v1",
     "modelId": "provider/model_id"
   }
 }

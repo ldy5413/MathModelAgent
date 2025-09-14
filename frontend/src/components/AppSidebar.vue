@@ -137,9 +137,9 @@ const socialMedia = [
           <SidebarMenu>
             <SidebarMenuItem v-for="childItem in item.items" :key="childItem.title">
               <SidebarMenuButton as-child :is-active="childItem.isActive">
-                <router-link :to="childItem.url" class="flex items-center justify-between w-full">
-                  <span>{{ childItem.title }}</span>
-                  <span v-if="childItem.status" class="text-[10px] px-2 py-0.5 rounded ml-2" :class="statusClass(childItem.status)">
+                <router-link :to="childItem.url" class="flex items-center justify-between gap-2 w-full overflow-hidden">
+                  <span class="truncate" :title="childItem.title">{{ childItem.title }}</span>
+                  <span v-if="childItem.status" class="text-[10px] px-2 py-0.5 rounded ml-2 shrink-0 whitespace-nowrap" :class="statusClass(childItem.status)">
                     {{ statusLabel(childItem.status) }}
                   </span>
                 </router-link>

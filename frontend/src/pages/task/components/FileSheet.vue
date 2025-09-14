@@ -183,9 +183,13 @@ const downloadAll = async () => {
     </SheetTrigger>
     <SheetContent side="right" class="w-[400px] sm:w-[540px]">
       <SheetHeader>
-        <SheetTitle class="flex items-center justify-between mr-5">
-          工作区文件
-
+        <SheetTitle class="flex items-center justify-between mr-5 gap-2">
+          <span>工作区文件</span>
+          <Button size="sm" variant="outline" class="flex items-center gap-2" :disabled="downloadingAll" @click="downloadAll">
+            <RefreshCw v-if="downloadingAll" class="w-4 h-4 animate-spin" />
+            <Archive v-else class="w-4 h-4" />
+            全部下载
+          </Button>
         </SheetTitle>
         <SheetDescription>
           运行的结果和产生在<span class="font-mono">backend/project/work_dir/{{ taskId }}/*</span> 目录下
