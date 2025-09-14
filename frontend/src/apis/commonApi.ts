@@ -36,3 +36,20 @@ export function getServiceStatus() {
 		redis: { status: string; message: string };
 	}>("/status");
 }
+// 历史任务列表
+export function getTasks() {
+  return request.get<{
+    task_id: string
+    created_at: string
+    status: 'running' | 'completed' | 'pending'
+    has_md: boolean
+    has_docx: boolean
+  }[]>("/tasks")
+}
+
+// 历史任务的消息
+export function getTaskMessages(task_id: string) {
+  return request.get<any[]>("/task_messages", {
+    params: { task_id },
+  })
+}

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { QQ_GROUP, TWITTER, GITHUB_LINK, BILLBILL, XHS, DISCORD } from '@/utils/const'
 import NavUser from './NavUser.vue'
+import { onMounted, reactive } from 'vue'
+import { getTasks } from '@/apis/commonApi'
 
 import {
   Sidebar,
@@ -19,8 +21,8 @@ import {
 
 const props = defineProps<SidebarProps>()
 
-// This is sample data.
-const data = {
+// 动态数据：开始 & 历史任务
+const data = reactive({
   navMain: [
     {
       title: '开始',
@@ -28,7 +30,7 @@ const data = {
       items: [
         {
           title: '开始新任务',
-          url: '#',
+          url: '/chat',
           isActive: false,
         },
       ],
@@ -36,13 +38,25 @@ const data = {
     {
       title: '历史任务',
       url: '#',
-      items: [
-
-      ],
+      items: [] as { title: string; url: string; isActive?: boolean }[],
     },
-
   ],
-}
+})
+
+onMounted(async () => {
+  try {
+    const res = await getTasks()
+    const tasks = Array.isArray(res.data) ? res.data : []
+    data.navMain[1].items = tasks.map(t => ({
+      title: `${t.task_id} ${t.status === 'running' ? '· 运行中' : ''}`.trim(),
+      url: `/task/${t.task_id}`,
+      isActive: false,
+    }))
+  } catch (e) {
+    // 静默失败，保持空列表
+    console.warn('加载历史任务失败', e)
+  }
+})
 
 
 const socialMedia = [

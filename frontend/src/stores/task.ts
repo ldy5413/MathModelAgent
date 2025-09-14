@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { TaskWebSocket } from '@/utils/websocket'
+import { getTaskMessages } from '@/apis/commonApi'
 import type { Message, CoderMessage, WriterMessage, UserMessage, ModelerMessage, CoordinatorMessage, InterpreterMessage } from '@/utils/response'
 // import messageData from '@/test/20250524-115938-d4c84576.json'
 import { AgentType } from '@/utils/enum'
@@ -12,10 +13,25 @@ export const useTaskStore = defineStore('task', () => {
   let ws: TaskWebSocket | null = null
 
   // 连接 WebSocket
-  function connectWebSocket(taskId: string) {
+  async function connectWebSocket(taskId: string) {
     const baseUrl = import.meta.env.VITE_WS_URL
     const wsUrl = `${baseUrl}/task/${taskId}`
 
+    // 1) 先尝试加载历史消息（如果存在），用于“历史任务”页面渲染
+    try {
+      const res = await getTaskMessages(taskId)
+      if (Array.isArray(res.data)) {
+        // 简单去重：按 id 去重
+        const existing = new Set(messages.value.map(m => (m as any).id))
+        for (const msg of res.data) {
+          if (!existing.has(msg.id)) messages.value.push(msg)
+        }
+      }
+    } catch (e) {
+      console.warn('加载历史消息失败（可忽略）', e)
+    }
+
+    // 2) 再建立 WebSocket，若任务仍在运行可继续接收增量消息
     ws = new TaskWebSocket(wsUrl, (data) => {
       console.log(data)
       messages.value.push(data)
