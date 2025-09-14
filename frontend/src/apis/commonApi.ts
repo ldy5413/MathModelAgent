@@ -53,3 +53,39 @@ export function getTaskMessages(task_id: string) {
     params: { task_id },
   })
 }
+
+export function getTaskStatus(task_id: string) {
+  return request.get<{ task_id: string; paused: boolean; running: boolean }>("/task/status", {
+    params: { task_id },
+  })
+}
+
+export function pauseTask(task_id: string) {
+  return request.post<{ success: boolean; message: string }>("/task/pause", null, {
+    params: { task_id },
+  })
+}
+
+export function resumeTask(task_id: string) {
+  return request.post<{ success: boolean; message: string }>("/task/resume", null, {
+    params: { task_id },
+  })
+}
+
+export function startTask(task_id: string) {
+  return request.post<{ success: boolean; message: string }>("/task/start", null, {
+    params: { task_id },
+  })
+}
+
+export function stopTask(task_id: string) {
+  return request.post<{ success: boolean; message: string }>("/task/stop", null, {
+    params: { task_id },
+  })
+}
+
+export function resetTask(task_id: string, auto_start: boolean = true) {
+  return request.post<{ success: boolean; message: string }>("/task/reset", null, {
+    params: { task_id, auto_start },
+  })
+}

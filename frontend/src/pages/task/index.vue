@@ -16,7 +16,7 @@ import ModelerEditor from '@/components/AgentEditor/ModelerEditor.vue'
 import ChatArea from '@/components/ChatArea.vue'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { useTaskStore } from '@/stores/task'
-import { getWriterSeque } from '@/apis/commonApi';
+import { getWriterSeque, getTaskStatus, startTask, stopTask, resetTask } from '@/apis/commonApi';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast/use-toast'
 import FilesSheet from '@/pages/task/components/FileSheet.vue'
@@ -32,6 +32,9 @@ const writerSequence = ref<string[]>([]);
 const startTime = ref<number>(Date.now())
 const currentTime = ref<number>(Date.now())
 let timer: ReturnType<typeof setInterval> | null = null
+const paused = ref<boolean>(false)
+const running = ref<boolean>(false)
+const statusText = ref<string>('created')
 
 // 格式化运行时长
 const formatDuration = (ms: number): string => {
@@ -56,6 +59,39 @@ const updateDuration = () => {
   runningDuration.value = formatDuration(currentTime.value - startTime.value)
 }
 
+const refreshStatus = async () => {
+  try {
+    const res = await getTaskStatus(props.task_id)
+    paused.value = !!res.data.paused
+    running.value = !!res.data.running
+    statusText.value = res.data.status || (running.value ? 'running' : 'created')
+  } catch (e) {
+    // ignore
+  }
+}
+
+const doStart = async () => {
+  try {
+    await startTask(props.task_id)
+    running.value = true
+    statusText.value = 'running'
+    toast({ title: '任务开始' })
+  } catch (e) {
+    toast({ title: '开始失败', variant: 'destructive' })
+  }
+}
+
+const doStop = async () => {
+  try {
+    await stopTask(props.task_id)
+    running.value = false
+    statusText.value = 'stopped'
+    toast({ title: '任务已停止' })
+  } catch (e) {
+    toast({ title: '停止失败', variant: 'destructive' })
+  }
+}
+
 console.log('Task ID:', props.task_id)
 
 onMounted(async () => {
@@ -66,6 +102,7 @@ onMounted(async () => {
   // 开始计时
   timer = setInterval(updateDuration, 1000)
   updateDuration() // 立即更新一次
+  await refreshStatus()
 })
 
 
@@ -96,6 +133,9 @@ onBeforeUnmount(() => {
                 <div class="text-sm text-gray-600">
                   运行时长: <span class="font-mono text-blue-600">{{ runningDuration }}</span>
                 </div>
+                <div class="text-sm" :class="running ? 'text-emerald-700' : 'text-orange-600'">
+                  {{ running ? '运行中' : (statusText === 'completed' ? '已完成' : (statusText === 'stopped' ? '已停止' : '未开始')) }}
+                </div>
                 <TabsList>
                   <TabsTrigger value="modeler" class="text-sm">
                     ModelerAgent
@@ -111,6 +151,9 @@ onBeforeUnmount(() => {
               <!--  TODO: 其他选项 -->
 
               <div class="flex justify-end gap-2 items-center">
+                <Button variant="outline" @click="async () => { await resetTask(props.task_id, true); await refreshStatus(); toast({ title: '已重置并重跑' }) }">重置并重跑</Button>
+                <Button v-if="!running" @click="doStart">开始</Button>
+                <Button v-else @click="doStop">停止</Button>
                 <Button @click="taskStore.downloadMessages" class="flex justify-end">
                   下载消息
                 </Button>

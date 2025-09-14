@@ -16,6 +16,7 @@ import re
 import uuid
 import ast
 import textwrap
+from app.services.task_control import TaskControl
 
 # TODO: 时间等待过久，stop 进程
 # TODO: 支持 cuda
@@ -162,6 +163,7 @@ class CoderAgent(Agent):  # 同样继承自Agent类
             retry_count < self.max_retries
             and self.current_chat_turns < self.max_chat_turns
         ):
+            await TaskControl.wait_if_paused(self.task_id)
             self.current_chat_turns += 1
             logger.info(f"当前对话轮次: {self.current_chat_turns}")
             response = await self.model.chat(

@@ -27,6 +27,8 @@ class UserOutput:
         self.ques_count: int = ques_count
         self.footnotes = {}
         self._init_seq()
+        # 尝试加载已有的部分结果（断点续写）
+        self._load_partial()
 
     def _init_seq(self):
         # 动态顺序获取拼接res value，正确拼接顺序
@@ -50,6 +52,13 @@ class UserOutput:
             "response_content": writer_response.response_content,
             "footnotes": writer_response.footnotes,
         }
+        # 每次写入后进行增量持久化，便于断点续跑
+        try:
+            partial_path = os.path.join(self.work_dir, "res.partial.json")
+            with open(partial_path, "w", encoding="utf-8") as f:
+                json.dump(self.res, f, ensure_ascii=False, indent=4)
+        except Exception:
+            pass
 
     def get_res(self):
         return self.res
@@ -158,3 +167,17 @@ class UserOutput:
         res_path = os.path.join(self.work_dir, "res.md")
         with open(res_path, "w", encoding="utf-8") as f:
             f.write(self.get_result_to_save())
+
+    def _load_partial(self):
+        """加载已存在的部分写作结果（若存在），用于断点续跑时跳过已完成小节。"""
+        partial_path = os.path.join(self.work_dir, "res.partial.json")
+        if not os.path.isfile(partial_path):
+            return
+        try:
+            with open(partial_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                self.res.update(data)
+        except Exception:
+            # 读取失败则忽略，保持空白
+            pass

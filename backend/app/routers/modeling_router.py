@@ -20,6 +20,10 @@ from pydantic import BaseModel
 import litellm
 from app.config.setting import settings
 import requests
+from app.services.task_control import TaskControl
+from app.services.task_registry import task_registry
+import json as pyjson
+import shutil
 
 router = APIRouter()
 
@@ -173,19 +177,18 @@ async def exampleModeling(
         dst_file = os.path.join(work_dir, file)
         with open(src_file, "rb") as src, open(dst_file, "wb") as dst:
             dst.write(src.read())
-    # 存储任务ID
-    await redis_manager.set(f"task_id:{task_id}", task_id)
-
-    logger.info(f"Adding background task for task_id: {task_id}")
-    # 将任务添加到后台执行
-    background_tasks.add_task(
-        run_modeling_task_async,
-        task_id,
-        ques_all,
-        CompTemplate.CHINA,
-        FormatOutPut.Markdown,
-    )
-    return {"task_id": task_id, "status": "processing"}
+    # 存储任务创建信息（不立即启动）
+    await redis_manager.set(f"task_id:{task_id}", task_id)  # 允许 WS 连接
+    payload = {
+        "ques_all": ques_all,
+        "comp_template": str(CompTemplate.CHINA.value if hasattr(CompTemplate.CHINA, 'value') else CompTemplate.CHINA),
+        "format_output": str(FormatOutPut.Markdown.value if hasattr(FormatOutPut.Markdown, 'value') else FormatOutPut.Markdown),
+    }
+    client = await redis_manager.get_client()
+    await client.set(f"task:{task_id}:payload", pyjson.dumps(payload))
+    await client.set(f"task:{task_id}:status", "created")
+    await redis_manager.publish_message(task_id, SystemMessage(content="任务已创建，点击开始执行。"))
+    return {"task_id": task_id, "status": "created"}
 
 
 @router.post("/modeling")
@@ -229,15 +232,18 @@ async def modeling(
     else:
         logger.warning("没有上传文件")
 
-    # 存储任务ID
-    await redis_manager.set(f"task_id:{task_id}", task_id)
-
-    logger.info(f"Adding background task for task_id: {task_id}")
-    # 将任务添加到后台执行
-    background_tasks.add_task(
-        run_modeling_task_async, task_id, ques_all, comp_template, format_output
-    )
-    return {"task_id": task_id, "status": "processing"}
+    # 存储任务创建信息（不立即启动）
+    await redis_manager.set(f"task_id:{task_id}", task_id)  # 允许 WS 连接
+    payload = {
+        "ques_all": ques_all,
+        "comp_template": str(comp_template.value if hasattr(comp_template, 'value') else comp_template),
+        "format_output": str(format_output.value if hasattr(format_output, 'value') else format_output),
+    }
+    client = await redis_manager.get_client()
+    await client.set(f"task:{task_id}:payload", pyjson.dumps(payload))
+    await client.set(f"task:{task_id}:status", "created")
+    await redis_manager.publish_message(task_id, SystemMessage(content="任务已创建，点击开始执行。"))
+    return {"task_id": task_id, "status": "created"}
 
 
 async def run_modeling_task_async(
@@ -320,3 +326,172 @@ async def run_modeling_task_async(
     )
     # 转换md为docx
     md_2_docx(task_id)
+
+
+@router.post("/task/pause")
+async def pause_task(task_id: str):
+    await TaskControl.pause(task_id)
+    return {"success": True, "message": "任务已暂停"}
+
+
+@router.post("/task/resume")
+async def resume_task(task_id: str):
+    await TaskControl.resume(task_id)
+    return {"success": True, "message": "任务已继续"}
+
+
+@router.get("/task/status")
+async def task_status(task_id: str):
+    paused = await TaskControl.is_paused(task_id)
+    client = await redis_manager.get_client()
+    status = await client.get(f"task:{task_id}:status")
+    # 兼容旧逻辑：若注册表有运行任务或 status==running 则 running
+    running = task_registry.is_running(task_id) or status == "running"
+    return {"task_id": task_id, "paused": paused, "running": running, "status": status}
+
+
+@router.post("/task/start")
+async def task_start(task_id: str):
+    client = await redis_manager.get_client()
+    payload_raw = await client.get(f"task:{task_id}:payload")
+    if not payload_raw:
+        raise HTTPException(status_code=404, detail="任务不存在或缺少payload")
+    payload = pyjson.loads(payload_raw)
+
+    if task_registry.is_running(task_id):
+        return {"success": False, "message": "任务已在运行"}
+
+    # 启动前确保取消暂停标记
+    try:
+        await TaskControl.resume(task_id)
+    except Exception:
+        pass
+
+    await client.set(f"task:{task_id}:status", "running")
+    await redis_manager.publish_message(task_id, SystemMessage(content="任务开始执行"))
+
+    async def runner():
+        try:
+            # 还原 Problem
+            comp_template = CompTemplate.CHINA
+            try:
+                comp_template = CompTemplate[payload["comp_template"]] if isinstance(payload["comp_template"], str) else CompTemplate.CHINA
+            except Exception:
+                pass
+            format_output = FormatOutPut.Markdown
+            try:
+                format_output = FormatOutPut[payload["format_output"]] if isinstance(payload["format_output"], str) else FormatOutPut.Markdown
+            except Exception:
+                pass
+            problem = Problem(
+                task_id=task_id,
+                ques_all=payload["ques_all"],
+                comp_template=comp_template,
+                format_output=format_output,
+            )
+
+            # 执行原有流程（不经 BackgroundTasks，便于取消）
+            # 校验
+            async def _validate_single(name: str, api_key: str | None, model_id: str | None, base_url: str | None) -> str | None:
+                if not model_id or model_id.strip() == "":
+                    return f"{name}: 模型未配置"
+                try:
+                    kwargs = {
+                        "api_key": api_key,
+                        "messages": [{"role": "user", "content": "hi"}],
+                        "model": model_id,
+                    }
+                    if base_url and base_url != "https://api.openai.com/v1":
+                        kwargs["base_url"] = base_url
+                    logger.info(f"{name} 验证参数: {kwargs}")
+                    await litellm.acompletion(**kwargs)
+                    return None
+                except Exception as e:
+                    return f"{name}: 验证失败 - {str(e)[:200]}"
+
+            async def _validate_all() -> list[str]:
+                tasks = [
+                    _validate_single("Coordinator", settings.COORDINATOR_API_KEY, settings.COORDINATOR_MODEL, settings.COORDINATOR_BASE_URL),
+                    _validate_single("Modeler", settings.MODELER_API_KEY, settings.MODELER_MODEL, settings.MODELER_BASE_URL),
+                    _validate_single("Coder", settings.CODER_API_KEY, settings.CODER_MODEL, settings.CODER_BASE_URL),
+                    _validate_single("Writer", settings.WRITER_API_KEY, settings.WRITER_MODEL, settings.WRITER_BASE_URL),
+                ]
+                results = await asyncio.gather(*tasks)
+                return [r for r in results if r]
+
+            await redis_manager.publish_message(task_id, SystemMessage(content="任务开始处理"))
+            await asyncio.sleep(1)
+
+            validation_errors = await _validate_all()
+            if validation_errors:
+                msg = "\n".join(validation_errors)
+                await redis_manager.publish_message(task_id, SystemMessage(content=f"模型配置验证失败:\n{msg}", type="error"))
+                await client.set(f"task:{task_id}:status", "failed")
+                return
+            else:
+                await redis_manager.publish_message(task_id, SystemMessage(content="模型配置验证成功"))
+
+            await MathModelWorkFlow().execute(problem)
+            await redis_manager.publish_message(task_id, SystemMessage(content="任务处理完成", type="success"))
+            md_2_docx(task_id)
+            await client.set(f"task:{task_id}:status", "completed")
+        except asyncio.CancelledError:
+            await redis_manager.publish_message(task_id, SystemMessage(content="任务已停止", type="warning"))
+            await client.set(f"task:{task_id}:status", "stopped")
+            raise
+        except Exception as e:
+            await redis_manager.publish_message(task_id, SystemMessage(content=f"任务执行失败: {e}", type="error"))
+            await client.set(f"task:{task_id}:status", "failed")
+        finally:
+            task_registry.remove(task_id)
+
+    t = asyncio.create_task(runner())
+    task_registry.add(task_id, t)
+    return {"success": True, "message": "任务已开始"}
+
+
+@router.post("/task/stop")
+async def task_stop(task_id: str):
+    ok = task_registry.cancel(task_id)
+    if not ok:
+        return {"success": False, "message": "任务不在运行"}
+    return {"success": True, "message": "停止信号已发送"}
+
+
+@router.post("/task/reset")
+async def task_reset(task_id: str, auto_start: bool = True):
+    """重置任务：
+    - 若在运行，先停止
+    - 清空工作目录（project/work_dir/{task_id}）
+    - 清除分段结果 res.partial.json/res.json/res.md/res.docx
+    - 将状态置为 created
+    - 可选：自动重新开始
+    """
+    # 停止运行中的任务
+    task_registry.cancel(task_id)
+
+    # 清理工作目录
+    from app.utils.common_utils import get_work_dir
+    try:
+        work_dir = get_work_dir(task_id)
+    except Exception:
+        # 目录不存在也无所谓
+        work_dir = None
+    if work_dir and os.path.isdir(work_dir):
+        try:
+            shutil.rmtree(work_dir)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"清理工作目录失败: {e}")
+
+    # 重新创建目录
+    from app.utils.common_utils import create_work_dir
+    create_work_dir(task_id)
+
+    client = await redis_manager.get_client()
+    await client.set(f"task:{task_id}:status", "created")
+    await TaskControl.resume(task_id)  # 确保无暂停标记
+    await redis_manager.publish_message(task_id, SystemMessage(content="任务已重置为初始状态"))
+
+    if auto_start:
+        return await task_start(task_id)
+    return {"success": True, "message": "任务已重置"}

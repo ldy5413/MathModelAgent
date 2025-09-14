@@ -71,6 +71,7 @@ async def list_tasks():
     # 读取 redis 客户端一次，避免重复连接
     client = await redis_manager.get_client()
 
+    client = await redis_manager.get_client()
     for name in names:
         task_dir = os.path.join(base_dir, name)
         res_md = os.path.join(task_dir, "res.md")
@@ -88,16 +89,26 @@ async def list_tasks():
         has_md = os.path.isfile(res_md)
         has_docx = os.path.isfile(res_docx)
         try:
-            is_running = await client.exists(f"task_id:{name}")
+            status_val = await client.get(f"task:{name}:status")
         except Exception:
-            is_running = 0
-        status = "running" if is_running else ("completed" if has_md or has_docx else "pending")
+            status_val = None
+        if not status_val:
+            # 兼容旧逻辑
+            try:
+                is_running = await client.exists(f"task_id:{name}")
+            except Exception:
+                is_running = 0
+            status_val = "running" if is_running else ("completed" if has_md or has_docx else "pending")
+        # 规范化状态：未知状态一律视为 completed
+        allowed = {"created", "running", "stopped", "completed", "failed", "pending"}
+        if status_val not in allowed:
+            status_val = "completed"
 
         entries.append(
             {
                 "task_id": name,
                 "created_at": created_at,
-                "status": status,
+                "status": status_val,
                 "has_md": has_md,
                 "has_docx": has_docx,
             }

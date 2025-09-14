@@ -10,6 +10,7 @@ import json
 from app.core.functions import writer_tools
 from icecream import ic
 from app.schemas.A2A import WriterResponse
+from app.services.task_control import TaskControl
 
 
 # 长文本
@@ -85,6 +86,7 @@ class WriterAgent(Agent):  # 同样继承自Agent类
 
         rounds = 0
         while True:
+            await TaskControl.wait_if_paused(self.task_id)
             # 获取历史消息用于本次对话
             response = await self.model.chat(
                 history=self.chat_history,

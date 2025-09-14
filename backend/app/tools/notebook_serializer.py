@@ -38,6 +38,14 @@ class NotebookSerializer:
             #     raise FileExistsError(
             #         f"文件 {self.notebook_path} 已存在。请选择其他文件名。"
             #     )
+            # 断点续写：如已存在 .ipynb，加载并在其基础上继续写入
+            if os.path.isfile(self.notebook_path):
+                try:
+                    self.nb = nbformat.read(self.notebook_path, as_version=4)
+                    self.initialized = True
+                except Exception:
+                    # 读取失败则保持新建 notebook
+                    pass
 
     def ansi_to_html(self, ansi_text):
         converter = ansi2html.Ansi2HTMLConverter()

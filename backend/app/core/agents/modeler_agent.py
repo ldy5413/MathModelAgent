@@ -6,6 +6,7 @@ from app.utils.log_util import logger
 from app.config.setting import settings
 import json
 from icecream import ic
+from app.services.task_control import TaskControl
 
 # TODO: 提问工具tool
 
@@ -33,6 +34,7 @@ class ModelerAgent(Agent):  # 继承自Agent类
 
         last_error = ""
         for attempt in range(1, settings.MAX_RETRIES + 1):
+            await TaskControl.wait_if_paused(self.task_id)
             response = await self.model.chat(
                 history=self.chat_history,
                 agent_name=self.__class__.__name__,

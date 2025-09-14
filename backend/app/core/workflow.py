@@ -123,6 +123,13 @@ class MathModelWorkFlow(WorkFlow):
         config_template = get_config_template(problem.comp_template)
 
         for key, value in solution_flows.items():
+            # 断点续跑：若该小节已在部分结果中存在，则跳过
+            if key in user_output.res and user_output.res[key].get("response_content"):
+                await redis_manager.publish_message(
+                    self.task_id,
+                    SystemMessage(content=f"检测到已完成，跳过 {key}")
+                )
+                continue
             await redis_manager.publish_message(
                 self.task_id,
                 SystemMessage(content=f"代码手开始求解{key}"),
@@ -171,6 +178,12 @@ class MathModelWorkFlow(WorkFlow):
             user_output, config_template, problem.ques_all
         )
         for key, value in write_flows.items():
+            if key in user_output.res and user_output.res[key].get("response_content"):
+                await redis_manager.publish_message(
+                    self.task_id,
+                    SystemMessage(content=f"检测到已完成，跳过 {key}")
+                )
+                continue
             await redis_manager.publish_message(
                 self.task_id,
                 SystemMessage(content=f"论文手开始写{key}部分"),

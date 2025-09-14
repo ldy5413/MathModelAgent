@@ -1,6 +1,7 @@
 from app.core.llm.llm import LLM, simple_chat
 from app.utils.log_util import logger
 from icecream import ic
+from app.services.task_control import TaskControl
 
 # TODO: Memory 的管理
 # TODO: 评估任务完成情况，rethinking
@@ -21,6 +22,10 @@ class Agent:
         self.current_chat_turns = 0  # 当前对话轮次计数器
         self.max_memory = max_memory  # 最大记忆轮次
 
+    async def _pause_guard(self):
+        """若任务被暂停，在此阻塞直到继续。"""
+        await TaskControl.wait_if_paused(self.task_id)
+
     async def run(self, prompt: str, system_prompt: str, sub_title: str) -> str:
         """
         执行agent的对话并返回结果和总结
@@ -40,6 +45,7 @@ class Agent:
             await self.append_chat_history({"role": "user", "content": prompt})
 
             # 获取历史消息用于本次对话
+            await self._pause_guard()
             response = await self.model.chat(
                 history=self.chat_history,
                 agent_name=self.__class__.__name__,
