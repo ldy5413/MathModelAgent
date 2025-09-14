@@ -1,6 +1,6 @@
 from app.core.agents.agent import Agent
 from app.core.llm.llm import LLM
-from app.core.prompts import MODELER_PROMPT
+from app.core.prompts import get_modeler_prompt
 from app.schemas.A2A import CoordinatorToModeler, ModelerToCoder
 from app.utils.log_util import logger
 from app.config.setting import settings
@@ -17,9 +17,10 @@ class ModelerAgent(Agent):  # 继承自Agent类
         task_id: str,
         model: LLM,
         max_chat_turns: int = 30,  # 添加最大对话轮次限制
+        language: str | None = None,
     ) -> None:
         super().__init__(task_id, model, max_chat_turns)
-        self.system_prompt = MODELER_PROMPT
+        self.system_prompt = get_modeler_prompt(language)
 
     async def run(self, coordinator_to_modeler: CoordinatorToModeler) -> ModelerToCoder:
         """根据 Coordinator 输出生成建模方案（带自动重试与字段校验）"""

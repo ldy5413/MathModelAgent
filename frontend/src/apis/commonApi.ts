@@ -89,3 +89,9 @@ export function resetTask(task_id: string, auto_start: boolean = true) {
     params: { task_id, auto_start },
   })
 }
+
+// 删除任务
+export function deleteTask(task_id: string) {
+  // 后端实现了 DELETE /tasks/{task_id}
+  return request.delete<{ success: boolean; message: string }>(`/tasks/${task_id}`)
+}

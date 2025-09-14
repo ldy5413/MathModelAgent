@@ -130,7 +130,8 @@ const handleSubmit = async () => {
       {
         ques_all: question.value,
         comp_template: selectedOptions.value.template,
-        format_output: selectedOptions.value.format
+        format_output: selectedOptions.value.format,
+        language: selectedOptions.value.language,
       },
       uploadedFiles.value
     )

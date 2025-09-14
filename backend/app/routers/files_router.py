@@ -167,3 +167,63 @@ async def get_task_messages(task_id: str):
     except Exception as e:
         # 读取失败时返回空数组，避免前端崩溃
         return []
+
+
+@router.delete("/tasks/{task_id}")
+async def delete_task(task_id: str):
+    """删除历史任务及其相关资源。
+
+    操作内容：
+    - 若任务在运行，先尝试取消
+    - 删除工作目录 `project/work_dir/{task_id}`
+    - 删除消息日志 `logs/messages/{task_id}.json`
+    - 清理与该任务相关的 Redis 键
+    """
+    from app.services.task_registry import task_registry
+    from app.services.task_control import PAUSE_KEY_TPL
+
+    # 1) 取消运行中的任务
+    try:
+        task_registry.cancel(task_id)
+    except Exception:
+        pass
+
+    # 2) 删除工作目录
+    try:
+        work_dir = get_work_dir(task_id)
+        if os.path.isdir(work_dir):
+            import shutil
+            shutil.rmtree(work_dir, ignore_errors=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除工作目录失败: {e}")
+
+    # 3) 删除消息日志
+    try:
+        log_path = Path("logs/messages") / f"{task_id}.json"
+        if log_path.exists():
+            log_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    # 4) 清理 Redis 键
+    try:
+        client = await redis_manager.get_client()
+        keys = [
+            f"task_id:{task_id}",
+            f"task:{task_id}:payload",
+            f"task:{task_id}:status",
+            PAUSE_KEY_TPL.format(task_id=task_id),
+        ]
+        try:
+            await client.delete(*keys)
+        except TypeError:
+            # 某些 redis 客户端不支持 *args
+            for k in keys:
+                try:
+                    await client.delete(k)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return {"success": True, "message": "任务已删除"}

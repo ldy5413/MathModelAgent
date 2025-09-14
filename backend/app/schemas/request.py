@@ -12,6 +12,7 @@ class Problem(BaseModel):
     ques_all: str = ""
     comp_template: CompTemplate = CompTemplate.CHINA
     format_output: FormatOutPut = FormatOutPut.Markdown
+    language: str = "zh"  # 'zh' or 'en'
 
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)

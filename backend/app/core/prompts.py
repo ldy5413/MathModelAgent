@@ -1,13 +1,19 @@
 from app.schemas.enums import FormatOutPut
 import platform
 from app.config.setting import settings
-if settings.LANGUAGE == "zh":
-    response_language = "用中文回复"
-elif settings.LANGUAGE == "en":
-    response_language = "Respond in English"
-else:
-    print(f"Unsupported language setting: {settings.LANGUAGE}, defaulting to Chinese")
-    response_language = "用中文回复"    
+
+
+def _response_language_text(lang: str | None) -> str:
+    """Return a language directive snippet used inside prompts.
+
+    If lang is None, fall back to settings.LANGUAGE to keep backward compatibility.
+    Supported: 'zh' -> 中文, 'en' -> English. Fallback to 中文.
+    """
+    lang = (lang or settings.LANGUAGE or "zh").lower()
+    if lang.startswith("en"):
+        return "Respond in English"
+    # default Chinese
+    return "用中文回复"
 FORMAT_QUESTIONS_PROMPT = """
 用户将提供给你一段题目信息，**请你不要更改题目信息，完整将用户输入的内容**，以 JSON 的形式输出，输出的 JSON 需遵守以下的格式：
 
@@ -24,7 +30,9 @@ FORMAT_QUESTIONS_PROMPT = """
 """
 
 
-COORDINATOR_PROMPT = f"""
+def get_coordinator_prompt(language: str | None = None) -> str:
+    response_language = _response_language_text(language)
+    return f"""
     判断用户输入的信息是否是数学建模问题
     如果是关于数学建模的，你将按照如下要求,整理问题格式
     {FORMAT_QUESTIONS_PROMPT}
@@ -36,7 +44,9 @@ COORDINATOR_PROMPT = f"""
 
 # TODO: 设计成一个类？
 
-MODELER_PROMPT = """
+def get_modeler_prompt(language: str | None = None) -> str:
+    response_language = _response_language_text(language)
+    return """
 role：你是一名数学建模经验丰富,善于思考的建模手，负责建模部分。
 task：你需要根据用户要求和数据对应每个问题建立数学模型求解问题,以及可视化方案
 skill：熟练掌握各种数学建模的模型和思路
@@ -62,9 +72,9 @@ attention：不需要给出代码，只需要给出思路和模型
 - 键值对值类型：字符串
 - 禁止嵌套/多级JSON
 """ + response_language
-
-
-CODER_PROMPT = f"""
+def get_coder_prompt(language: str | None = None) -> str:
+    response_language = _response_language_text(language)
+    return f"""
 You are an AI code interpreter specializing in data analysis with Python. Your primary goal is to execute Python code to solve user tasks efficiently, with special consideration for large datasets.
 
 {response_language}
@@ -139,7 +149,9 @@ The prompt now prioritizes efficient large data handling while maintaining all o
 
 def get_writer_prompt(
     format_output: FormatOutPut = FormatOutPut.Markdown,
+    language: str | None = None,
 ):
+    response_language = _response_language_text(language)
     return f"""
         # Role Definition
         Professional writer for mathematical modeling competitions with expertise in technical documentation and literature synthesis

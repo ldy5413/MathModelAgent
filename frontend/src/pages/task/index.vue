@@ -16,7 +16,7 @@ import ModelerEditor from '@/components/AgentEditor/ModelerEditor.vue'
 import ChatArea from '@/components/ChatArea.vue'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { useTaskStore } from '@/stores/task'
-import { getWriterSeque, getTaskStatus, startTask, stopTask, resetTask } from '@/apis/commonApi';
+import { getWriterSeque, getTaskStatus, startTask, stopTask, resetTask, deleteTask } from '@/apis/commonApi';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast/use-toast'
 import FilesSheet from '@/pages/task/components/FileSheet.vue'
@@ -25,6 +25,8 @@ const { toast } = useToast()
 
 const props = defineProps<{ task_id: string }>()
 const taskStore = useTaskStore()
+import { useRouter } from 'vue-router'
+const router = useRouter()
 
 const writerSequence = ref<string[]>([]);
 
@@ -89,6 +91,17 @@ const doStop = async () => {
     toast({ title: '任务已停止' })
   } catch (e) {
     toast({ title: '停止失败', variant: 'destructive' })
+  }
+}
+
+const doDelete = async () => {
+  try {
+    if (!window.confirm('确认删除该任务及其所有文件？此操作不可恢复。')) return
+    await deleteTask(props.task_id)
+    toast({ title: '任务已删除' })
+    router.push('/chat')
+  } catch (e) {
+    toast({ title: '删除失败', variant: 'destructive' })
   }
 }
 
@@ -159,6 +172,8 @@ onBeforeUnmount(() => {
                 </Button>
 
                 <FilesSheet />
+
+                <Button variant="destructive" @click="doDelete">删除任务</Button>
 
               </div>
 

@@ -27,13 +27,14 @@ class WriterAgent(Agent):  # 同样继承自Agent类
         format_output: FormatOutPut = FormatOutPut.Markdown,
         scholar: OpenAlexScholar = None,
         max_memory: int = 25,  # 添加最大记忆轮次
+        language: str | None = None,
     ) -> None:
         super().__init__(task_id, model, max_chat_turns, max_memory)
         self.format_out_put = format_output
         self.comp_template = comp_template
         self.scholar = scholar
         self.is_first_run = True
-        self.system_prompt = get_writer_prompt(format_output)
+        self.system_prompt = get_writer_prompt(format_output, language)
         self.available_images: list[str] = []
 
     async def run(

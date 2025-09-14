@@ -6,7 +6,7 @@ from app.schemas.response import SystemMessage, InterpreterMessage
 from app.tools.base_interpreter import BaseCodeInterpreter
 from app.core.llm.llm import LLM
 from app.schemas.A2A import CoderToWriter
-from app.core.prompts import CODER_PROMPT
+from app.core.prompts import get_coder_prompt
 from app.utils.common_utils import get_current_files
 import json
 from app.core.prompts import get_reflection_prompt, get_completion_check_prompt
@@ -33,12 +33,13 @@ class CoderAgent(Agent):  # 同样继承自Agent类
         max_chat_turns: int = settings.MAX_CHAT_TURNS,  # 最大聊天次数
         max_retries: int = settings.MAX_RETRIES,  # 最大反思次数
         code_interpreter: BaseCodeInterpreter = None,
+        language: str | None = None,
     ) -> None:
         super().__init__(task_id, model, max_chat_turns)
         self.work_dir = work_dir
         self.max_retries = max_retries
         self.is_first_run = True
-        self.system_prompt = CODER_PROMPT
+        self.system_prompt = get_coder_prompt(language)
         self.code_interpreter = code_interpreter
 
     def _sanitize_code(self, code: str) -> str:

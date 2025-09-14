@@ -205,6 +205,7 @@ async def modeling(
     ques_all: str = Form(...),  # 从表单获取
     comp_template: CompTemplate = Form(...),  # 从表单获取
     format_output: FormatOutPut = Form(...),  # 从表单获取
+    language: str | None = Form(None),  # 'zh' | 'en'
     files: list[UploadFile] = File(default=None),
 ):
     task_id = create_task_id()
@@ -244,11 +245,16 @@ async def modeling(
 
     # 存储任务创建信息（不立即启动）
     await redis_manager.set(f"task_id:{task_id}", task_id)  # 允许 WS 连接
+    # 语言标准化（默认中文）
+    lang = (language or settings.LANGUAGE or "zh").lower()
+    lang = "en" if lang.startswith("en") else "zh"
+
     payload = {
         "ques_all": ques_all,
         "comp_template": str(comp_template.value if hasattr(comp_template, 'value') else comp_template),
         "format_output": str(format_output.value if hasattr(format_output, 'value') else format_output),
         "data_files": saved_files if files else [],
+        "language": lang,
     }
     client = await redis_manager.get_client()
     await client.set(f"task:{task_id}:payload", pyjson.dumps(payload))
@@ -268,6 +274,7 @@ async def run_modeling_task_async(
     ques_all: str,
     comp_template: CompTemplate,
     format_output: FormatOutPut,
+    language: str = "zh",
 ):
     logger.info(f"run modeling task for task_id: {task_id}")
 
@@ -329,6 +336,7 @@ async def run_modeling_task_async(
         ques_all=ques_all,
         comp_template=comp_template,
         format_output=format_output,
+        language=language,
     )
 
     # 创建任务并等待它完成
@@ -400,11 +408,20 @@ async def task_start(task_id: str):
                 format_output = FormatOutPut[payload["format_output"]] if isinstance(payload["format_output"], str) else FormatOutPut.Markdown
             except Exception:
                 pass
+            # 语言
+            language = "zh"
+            try:
+                language = str(payload.get("language", "zh")).lower()
+                language = "en" if language.startswith("en") else "zh"
+            except Exception:
+                language = "zh"
+
             problem = Problem(
                 task_id=task_id,
                 ques_all=payload["ques_all"],
                 comp_template=comp_template,
                 format_output=format_output,
+                language=language,
             )
 
             # 执行原有流程（不经 BackgroundTasks，便于取消）

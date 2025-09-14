@@ -36,7 +36,7 @@ class MathModelWorkFlow(WorkFlow):
         llm_factory = LLMFactory(self.task_id)
         coordinator_llm, modeler_llm, coder_llm, writer_llm = llm_factory.get_all_llms()
 
-        coordinator_agent = CoordinatorAgent(self.task_id, coordinator_llm)
+        coordinator_agent = CoordinatorAgent(self.task_id, coordinator_llm, language=problem.language)
 
         await redis_manager.publish_message(
             self.task_id,
@@ -62,7 +62,7 @@ class MathModelWorkFlow(WorkFlow):
             SystemMessage(content="建模手开始建模ing..."),
         )
 
-        modeler_agent = ModelerAgent(self.task_id, modeler_llm)
+        modeler_agent = ModelerAgent(self.task_id, modeler_llm, language=problem.language)
 
         try:
             modeler_response = await modeler_agent.run(coordinator_response)
@@ -106,6 +106,7 @@ class MathModelWorkFlow(WorkFlow):
             max_chat_turns=settings.MAX_CHAT_TURNS,
             max_retries=settings.MAX_RETRIES,
             code_interpreter=code_interpreter,
+            language=problem.language,
         )
 
         writer_agent = WriterAgent(
@@ -114,6 +115,7 @@ class MathModelWorkFlow(WorkFlow):
             comp_template=problem.comp_template,
             format_output=problem.format_output,
             scholar=scholar,
+            language=problem.language,
         )
 
         flows = Flows(self.questions)

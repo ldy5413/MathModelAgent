@@ -1,6 +1,6 @@
 from app.core.agents.agent import Agent
 from app.core.llm.llm import LLM
-from app.core.prompts import COORDINATOR_PROMPT, FORMAT_QUESTIONS_PROMPT
+from app.core.prompts import get_coordinator_prompt, FORMAT_QUESTIONS_PROMPT
 import json
 import re
 from app.utils.log_util import logger
@@ -14,9 +14,10 @@ class CoordinatorAgent(Agent):
         task_id: str,
         model: LLM,
         max_chat_turns: int = 30,
+        language: str | None = None,
     ) -> None:
         super().__init__(task_id, model, max_chat_turns)
-        self.system_prompt = COORDINATOR_PROMPT
+        self.system_prompt = get_coordinator_prompt(language)
 
     async def run(self, ques_all: str) -> CoordinatorToModeler:
         """用户输入问题 使用LLM 格式化 questions（带自动重试与校验）"""
