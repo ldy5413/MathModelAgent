@@ -60,7 +60,7 @@ class WriterAgent(Agent):  # 同样继承自Agent类
             self.available_images = available_images
             # 拼接成完整URL
             image_list = ",".join(available_images)
-            image_prompt = f"\n可用的图片链接列表：\n{image_list}\n请在写作时适当引用这些图片链接。"
+            image_prompt = f"\n可用的图片链接列表：\n{image_list}\n请在写作时适当引用这些图片链接。采用markdown语法插入图片，例如： ![描述性文字](图片链接) 。\n"
             logger.info(f"image_prompt是:{image_prompt}")
             prompt = prompt + image_prompt
 
