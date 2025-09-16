@@ -11,6 +11,7 @@ from app.services.redis_manager import redis_manager
 from app.tools.notebook_serializer import NotebookSerializer
 from app.core.flows import Flows
 from app.core.llm.llm_factory import LLMFactory
+from app.services.checkpoint_control import CheckpointControl
 
 
 class WorkFlow:
@@ -44,7 +45,17 @@ class MathModelWorkFlow(WorkFlow):
         )
 
         try:
-            coordinator_response = await coordinator_agent.run(problem.ques_all)
+            while True:
+                coordinator_response = await coordinator_agent.run(problem.ques_all)
+                # 检查点：CoordinatorAgent 完成一次
+                feedback = await CheckpointControl.prompt_and_wait(
+                    self.task_id, agent="CoordinatorAgent", timeout_sec=10
+                )
+                if feedback:
+                    # 用户反馈加入历史后再次执行
+                    await coordinator_agent.append_chat_history({"role": "user", "content": feedback})
+                    continue
+                break
             self.questions = coordinator_response.questions
             self.ques_count = coordinator_response.ques_count
         except Exception as e:
@@ -65,7 +76,16 @@ class MathModelWorkFlow(WorkFlow):
         modeler_agent = ModelerAgent(self.task_id, modeler_llm, language=problem.language)
 
         try:
-            modeler_response = await modeler_agent.run(coordinator_response)
+            while True:
+                modeler_response = await modeler_agent.run(coordinator_response)
+                # 检查点：ModelerAgent 完成一次
+                feedback = await CheckpointControl.prompt_and_wait(
+                    self.task_id, agent="ModelerAgent", timeout_sec=10
+                )
+                if feedback:
+                    await modeler_agent.append_chat_history({"role": "user", "content": feedback})
+                    continue
+                break
         except Exception as e:
             logger.error(f"ModelerAgent 执行失败: {e}")
             raise e
@@ -137,9 +157,19 @@ class MathModelWorkFlow(WorkFlow):
                 SystemMessage(content=f"代码手开始求解{key}"),
             )
 
-            coder_response = await coder_agent.run(
-                prompt=value["coder_prompt"], subtask_title=key
-            )
+            while True:
+                coder_response = await coder_agent.run(
+                    prompt=value["coder_prompt"], subtask_title=key
+                )
+
+                # 检查点：CoderAgent 小节完成
+                feedback = await CheckpointControl.prompt_and_wait(
+                    self.task_id, agent="CoderAgent", sub_title=key, timeout_sec=10
+                )
+                if feedback:
+                    await coder_agent.append_chat_history({"role": "user", "content": feedback})
+                    continue
+                break
 
             await redis_manager.publish_message(
                 self.task_id,
@@ -156,11 +186,21 @@ class MathModelWorkFlow(WorkFlow):
             )
 
             ## TODO: 图片引用错误
-            writer_response = await writer_agent.run(
-                writer_prompt,
-                available_images=coder_response.created_images,
-                sub_title=key,
-            )
+            while True:
+                writer_response = await writer_agent.run(
+                    writer_prompt,
+                    available_images=coder_response.created_images,
+                    sub_title=key,
+                )
+
+                # 检查点：WriterAgent 小节完成
+                feedback = await CheckpointControl.prompt_and_wait(
+                    self.task_id, agent="WriterAgent", sub_title=key, timeout_sec=10
+                )
+                if feedback:
+                    await writer_agent.append_chat_history({"role": "user", "content": feedback})
+                    continue
+                break
 
             await redis_manager.publish_message(
                 self.task_id,
@@ -191,7 +231,17 @@ class MathModelWorkFlow(WorkFlow):
                 SystemMessage(content=f"论文手开始写{key}部分"),
             )
 
-            writer_response = await writer_agent.run(prompt=value, sub_title=key)
+            while True:
+                writer_response = await writer_agent.run(prompt=value, sub_title=key)
+
+                # 检查点：WriterAgent 写作完成（写作阶段）
+                feedback = await CheckpointControl.prompt_and_wait(
+                    self.task_id, agent="WriterAgent", sub_title=key, timeout_sec=10
+                )
+                if feedback:
+                    await writer_agent.append_chat_history({"role": "user", "content": feedback})
+                    continue
+                break
 
             user_output.set_res(key, writer_response)
 

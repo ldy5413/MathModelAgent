@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal, Union, Optional
 from app.schemas.enums import AgentType
 from pydantic import BaseModel, Field
 from uuid import uuid4
@@ -22,6 +22,8 @@ class ToolMessage(Message):
 class SystemMessage(Message):
     msg_type: str = "system"
     type: Literal["info", "warning", "success", "error"] = "info"
+    # 可选：用于在前端渲染交互控件（例如：检查点“继续/反馈”）
+    action: Optional[dict] = None  # 结构见前端：{ kind: 'checkpoint', checkpoint_id, timeout_sec, agent, sub_title? }
 
 
 class UserMessage(Message):

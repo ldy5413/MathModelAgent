@@ -24,6 +24,7 @@ from app.services.task_control import TaskControl
 from app.services.task_registry import task_registry
 import json as pyjson
 import shutil
+from typing import Literal, Optional
 
 router = APIRouter()
 
@@ -54,6 +55,13 @@ class SaveApiConfigRequest(BaseModel):
     coder: dict
     writer: dict
     openalex_email: str
+
+
+class CheckpointRespondRequest(BaseModel):
+    checkpoint_id: str
+    # feedback_open: 用户点击“提供反馈”进入输入态；feedback: 提交反馈内容
+    action: Literal["continue", "feedback", "feedback_open"]
+    content: Optional[str] = None
 
 
 @router.post("/save-api-config")
@@ -482,6 +490,32 @@ async def task_start(task_id: str):
     t = asyncio.create_task(runner())
     task_registry.add(task_id, t)
     return {"success": True, "message": "任务已开始"}
+
+
+@router.post("/task/checkpoint/respond")
+async def checkpoint_respond(task_id: str, req: CheckpointRespondRequest):
+    """处理前端的检查点响应（继续/反馈）。"""
+    from app.services.checkpoint_control import CHECKPOINT_KEY_TPL, CHECKPOINT_HOLD_KEY_TPL
+    client = await redis_manager.get_client()
+    key = CHECKPOINT_KEY_TPL.format(task_id=task_id, checkpoint_id=req.checkpoint_id)
+    hold_key = CHECKPOINT_HOLD_KEY_TPL.format(task_id=task_id, checkpoint_id=req.checkpoint_id)
+    try:
+        if req.action == "feedback_open":
+            # 标记进入反馈输入态：后端暂停倒计时
+            await client.set(hold_key, "1")
+            await client.expire(hold_key, 3600)  # 最多保留 1h，避免无限挂起
+        else:
+            # 收到继续/反馈提交：写入响应并清理 hold
+            payload = {"action": req.action, "content": req.content or ""}
+            await client.set(key, pyjson.dumps(payload))
+            await client.expire(key, 120)
+            try:
+                await client.delete(hold_key)
+            except Exception:
+                pass
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"提交失败: {e}")
 
 
 @router.post("/task/stop")

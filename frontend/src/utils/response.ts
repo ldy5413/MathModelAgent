@@ -21,6 +21,14 @@ export interface ToolMessage extends BaseMessage {
 export interface SystemMessage extends BaseMessage {
   msg_type: 'system';
   type: SystemMessageType;
+  // 可选：前端交互动作（例如检查点）
+  action?: {
+    kind: 'checkpoint';
+    checkpoint_id: string;
+    timeout_sec: number;
+    agent: string;
+    sub_title?: string;
+  };
 }
 
 export interface UserMessage extends BaseMessage {

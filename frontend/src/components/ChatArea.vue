@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Bubble from './Bubble.vue'
 import SystemMessage from './SystemMessage.vue'
+import CheckpointMessage from './CheckpointMessage.vue'
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,8 +34,10 @@ const sendMessage = () => {
           <Bubble v-else-if="message.msg_type === 'agent'" type="agent" :agentType="message.agent_type"
             :content="message.content || ''" />
           <!-- 系统消息 -->
-          <SystemMessage v-else-if="message.msg_type === 'system'" :content="message.content || ''"
-            :type="message.type" />
+          <template v-else-if="message.msg_type === 'system'">
+            <CheckpointMessage v-if="'action' in message && message.action && message.action.kind === 'checkpoint'" :message="message as any" />
+            <SystemMessage v-else :content="message.content || ''" :type="message.type" />
+          </template>
         </div>
       </template>
     </div>

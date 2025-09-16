@@ -504,6 +504,13 @@ class CoderAgent(Agent):  # 同样继承自Agent类
                 else:
                     # 未提取到代码块，按任务完成处理
                     logger.info("没有工具调用且未检测到代码块，判定任务完成")
+                    try:
+                        await self.append_chat_history({
+                            "role": "assistant",
+                            "content": assistant_content,
+                        })
+                    except Exception:
+                        pass
                     return CoderToWriter(
                         coder_response=assistant_content,
                         created_images=await self.code_interpreter.get_created_images(
@@ -521,6 +528,14 @@ class CoderAgent(Agent):  # 同样继承自Agent类
 
         logger.info(f"{self.__class__.__name__}:完成:执行子任务: {subtask_title}")
 
+        # 追加最终助手输出到历史
+        try:
+            await self.append_chat_history({
+                "role": "assistant",
+                "content": response.choices[0].message.content,
+            })
+        except Exception:
+            pass
         return CoderToWriter(
             coder_response=response.choices[0].message.content,
             created_images=await self.code_interpreter.get_created_images(

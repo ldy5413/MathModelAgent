@@ -60,6 +60,14 @@ class ModelerAgent(Agent):  # 继承自Agent类
                         value_type_issue = [k for k, v in data.items() if not isinstance(v, str)]
                         if not missing and not value_type_issue:
                             ic(data)
+                            # 将助手输出加入对话历史，便于后续结合“用户反馈”继续对话
+                            try:
+                                await self.append_chat_history({
+                                    "role": "assistant",
+                                    "content": raw,
+                                })
+                            except Exception:
+                                pass
                             return ModelerToCoder(questions_solution=data)
                         else:
                             parts = []

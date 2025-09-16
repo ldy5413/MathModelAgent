@@ -42,6 +42,14 @@ class CoordinatorAgent(Agent):
                 if not json_str:
                     raise ValueError("返回的 JSON 字符串为空")
 
+                # 成功解析时，将助手输出加入对话历史，便于后续基于反馈继续对话
+                try:
+                    await self.append_chat_history({
+                        "role": "assistant",
+                        "content": response.choices[0].message.content,
+                    })
+                except Exception:
+                    pass
                 questions = json.loads(json_str)
                 ques_count = questions["ques_count"]
                 logger.info(f"questions:{questions}")

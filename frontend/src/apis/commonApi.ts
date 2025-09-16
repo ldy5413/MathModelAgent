@@ -95,3 +95,10 @@ export function deleteTask(task_id: string) {
   // 后端实现了 DELETE /tasks/{task_id}
   return request.delete<{ success: boolean; message: string }>(`/tasks/${task_id}`)
 }
+
+// 检查点响应（继续/反馈）
+export function respondCheckpoint(task_id: string, payload: { checkpoint_id: string; action: 'continue' | 'feedback'; content?: string }) {
+  return request.post<{ success: boolean }>("/task/checkpoint/respond", payload, {
+    params: { task_id },
+  })
+}
