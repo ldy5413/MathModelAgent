@@ -66,7 +66,8 @@ marked.use({
   hooks: {
     preprocess(markdown) {
       // 处理图片链接
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+      // 默认使用 /api，经过 Vite 代理或反向代理转发到后端
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
       const taskId = window.localStorage.getItem('currentTaskId') || ''
       
       return markdown.replace(

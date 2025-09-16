@@ -4,7 +4,8 @@ import axios from "axios";
 
 // 创建axios实例
 const service = axios.create({
-	baseURL: import.meta.env.VITE_API_BASE_URL, // 从环境变量获取基础URL
+	// 默认走 Vite 代理到 /api，这样 localhost 和外网域名都可用
+	baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
 	timeout: 10000, // 请求超时时间
 });
 

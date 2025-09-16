@@ -14,8 +14,14 @@ export const useTaskStore = defineStore('task', () => {
 
   // 连接 WebSocket
   async function connectWebSocket(taskId: string) {
-    const baseUrl = import.meta.env.VITE_WS_URL
-    const wsUrl = `${baseUrl}/task/${taskId}`
+    const base = import.meta.env.VITE_WS_URL || '/api'
+    // 支持两种配置：
+    // 1) 绝对地址：ws(s)://host:port -> 直接使用
+    // 2) 相对路径：/api -> 自动拼当前站点的 ws(s)://host + 路径
+    const isAbsolute = typeof base === 'string' && (base.startsWith('ws://') || base.startsWith('wss://'))
+    const wsUrl = isAbsolute
+      ? `${base}/task/${taskId}`
+      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${base}/task/${taskId}`
 
     // 1) 先尝试加载历史消息（如果存在），用于“历史任务”页面渲染
     try {

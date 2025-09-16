@@ -35,14 +35,15 @@ app.include_router(common_router.router)
 app.include_router(files_router.router)
 
 
-# 跨域 CORS
+# CORS
+# Use env-driven list from settings; set to ["*"] to allow all.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],  # 暴露所有响应头
+    expose_headers=["*"],  # expose all response headers
 )
 
 app.mount(
