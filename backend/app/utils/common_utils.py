@@ -6,7 +6,6 @@ from app.schemas.enums import CompTemplate
 from app.utils.log_util import logger
 import re
 import pypandoc
-from app.config.setting import settings
 from icecream import ic
 
 
@@ -75,11 +74,13 @@ def get_current_files(folder_path: str, type: str = "all") -> list[str]:
         ]
 
 
-# 判断content是否包含图片 xx.png,对其处理为    ![filename](http://localhost:8000/static/20250428-200915-ebc154d4/filename.jpg)
+# 判断content是否包含图片 xx.png
+# 将其转换为相对路径的静态资源链接，以便前端在本地开发（/api 代理）
+# 和生产反向代理下都能正确访问：![filename](/static/{task_id}/filename.jpg)
 def transform_link(task_id: str, content: str):
     content = re.sub(
         r"!\[(.*?)\]\((.*?\.(?:png|jpg|jpeg|gif|bmp|webp))\)",
-        lambda match: f"![{match.group(1)}]({settings.SERVER_HOST}/static/{task_id}/{match.group(2)})",
+        lambda match: f"![{match.group(1)}](/static/{task_id}/{match.group(2)})",
         content,
     )
     return content

@@ -14,7 +14,9 @@ router = APIRouter()
 
 @router.get("/download_url")
 async def get_download_url(task_id: str, filename: str):
-    return {"download_url": f"http://localhost:8000/static/{task_id}/{filename}"}
+    # 返回相对路径，前端用其 API 基础前缀（如 /api）拼接，
+    # 以同时兼容本地开发代理和反向代理域名访问。
+    return {"download_url": f"/static/{task_id}/{filename}"}
 
 
 @router.get("/download_all_url")
@@ -35,7 +37,8 @@ async def get_download_all_url(task_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"打包失败: {e}")
 
-    return {"download_url": f"http://localhost:8000/static/{task_id}/all.zip"}
+    # 返回相对路径，前端负责拼接基础前缀
+    return {"download_url": f"/static/{task_id}/all.zip"}
 
 
 @router.get("/files")

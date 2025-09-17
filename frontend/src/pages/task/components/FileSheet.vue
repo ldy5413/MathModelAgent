@@ -35,6 +35,13 @@ const loadingFiles = ref(false)
 const downloadingFile = ref<string | null>(null)
 const downloadingAll = ref(false)
 
+// 规范化后端返回的下载链接：
+// - 若为绝对链接（http/https），直接使用
+// - 否则使用 API 基础前缀（默认 /api）拼接，从而兼容本地代理与反向代理
+const makeDownloadHref = (url: string) => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+  return /^https?:\/\//.test(url) ? url : `${baseUrl}${url}`
+}
 
 const openFolder = async () => {
   console.log('openFolder', taskId)
@@ -100,7 +107,7 @@ const downloadSingleFile = async (filename: string) => {
     if (res.data?.download_url) {
       // 创建隐藏的链接元素并触发下载
       const link = document.createElement('a')
-      link.href = res.data.download_url
+      link.href = makeDownloadHref(res.data.download_url)
       link.download = filename
       link.target = '_blank'
       document.body.appendChild(link)
@@ -134,7 +141,7 @@ const downloadAll = async () => {
     if (res.data?.download_url) {
       // 创建隐藏的链接元素并触发下载
       const link = document.createElement('a')
-      link.href = res.data.download_url
+      link.href = makeDownloadHref(res.data.download_url)
       link.download = `task_${taskId}_files.zip`
       link.target = '_blank'
       document.body.appendChild(link)
@@ -242,3 +249,10 @@ const downloadAll = async () => {
     </SheetContent>
   </Sheet>
 </template>
+// 规范化后端返回的下载链接：
+// - 若为绝对链接（http/https），直接使用
+// - 否则使用 API 基础前缀（默认 /api）拼接，从而兼容本地代理与反向代理
+const makeDownloadHref = (url: string) => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+  return /^https?:\/\//.test(url) ? url : `${baseUrl}${url}`
+}

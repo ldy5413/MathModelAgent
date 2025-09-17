@@ -65,14 +65,28 @@ marked.use({ renderer })
 marked.use({
   hooks: {
     preprocess(markdown) {
-      // 处理图片链接
-      // 默认使用 /api，经过 Vite 代理或反向代理转发到后端
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+      // 处理图片链接，兼容以下形式：
+      // 1) fig.png / images/fig.png -> {base}/static/{taskId}/{src}
+      // 2) /static/{taskId}/fig.png -> {base}/static/{taskId}/fig.png
+      // 3) 已是 http(s) 或已含 {base} 前缀 -> 不处理
+      const base = import.meta.env.VITE_API_BASE_URL || '/api'
       const taskId = window.localStorage.getItem('currentTaskId') || ''
-      
+
       return markdown.replace(
         /!\[(.*?)\]\(((?!http[s]?:\/\/).*?\.(?:png|jpg|jpeg|gif|bmp|webp))\)/g,
-        (_, alt, src) => `![${alt}](${baseUrl}/static/${taskId}/${src})`
+        (_match, alt, rawSrc) => {
+          const src = String(rawSrc || '')
+          // 已经带有 /api 或自定义 base 前缀，直接保留
+          if (src.startsWith(base + '/')) {
+            return `![${alt}](${src})`
+          }
+          // 已经是 /static/... 形式，则只补上 base 前缀
+          if (src.startsWith('/static/')) {
+            return `![${alt}](${base}${src})`
+          }
+          // 其他相对路径，拼 taskId
+          return `![${alt}](${base}/static/${taskId}/${src})`
+        }
       )
     }
   }
